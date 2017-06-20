@@ -17,7 +17,7 @@ import scala.concurrent.duration.{Duration, TimeUnit}
 /**
   * Created by nirmalya on 5/6/17.
   */
-class GamePlayRecorderActor(val cleanDataOnExit: Boolean) extends FSM [HuddleGameState, HuddleGameFSMData] with ActorLogging {
+class GamePlayRecorderActor(val cleanDataOnExit: Boolean, val seededWithSession: GameSession) extends FSM [HuddleGameState, HuddleGameFSMData] with ActorLogging {
 
   //TODO
   // 1) Pick Redis configurationn values from Akka Config, instead of hardcoding
@@ -288,5 +288,5 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean) extends FSM [HuddleGam
 }
 
 object GamePlayRecorderActor {
-  def props = Props(new GamePlayRecorderActor(true))
+  def apply(shouldCleanUpREDIS: Boolean, sessionID: GameSession): Props = Props(new GamePlayRecorderActor(shouldCleanUpREDIS, sessionID))
 }

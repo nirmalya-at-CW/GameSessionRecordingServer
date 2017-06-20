@@ -42,9 +42,9 @@ class GamePlayRecorderActorStateCorrectnessTest extends TestKit(ActorSystem("Hud
 
   "A Huddle GamePlay Actor" must {
 
-    /* "be at state when game is yet to start" in {
+     "be at state when game is yet to start" in {
 
-      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor.props,"RecorderActorForTest-1")
+      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor(true, gameSession),"RecorderActorForTest-1")
 
       val testProbe = TestProbe()
 
@@ -57,7 +57,7 @@ class GamePlayRecorderActorStateCorrectnessTest extends TestKit(ActorSystem("Hud
 
     "go to STARTed state, after game starts" in {
 
-      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor.props,"RecorderActorForTest-2")
+      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor(true, gameSession),"RecorderActorForTest-2")
 
       val testProbe = TestProbe()
       gamePlayRecorderActor ! SubscribeTransitionCallBack(testProbe.ref)
@@ -75,7 +75,7 @@ class GamePlayRecorderActorStateCorrectnessTest extends TestKit(ActorSystem("Hud
 
     "remain at Continuing state, when the player answers a question" in {
 
-      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor.props,"RecorderActorForTest-3")
+      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor(true, gameSession),"RecorderActorForTest-3")
 
       val testProbe = TestProbe()
       gamePlayRecorderActor ! SubscribeTransitionCallBack(testProbe.ref)
@@ -100,7 +100,7 @@ class GamePlayRecorderActorStateCorrectnessTest extends TestKit(ActorSystem("Hud
 
     "remain at Paused state, when the player pauses the game after starting the game" in {
 
-      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor.props,"RecorderActorForTest-4")
+      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor(true, gameSession),"RecorderActorForTest-4")
 
       val testProbe = TestProbe()
       gamePlayRecorderActor ! SubscribeTransitionCallBack(testProbe.ref)
@@ -123,7 +123,7 @@ class GamePlayRecorderActorStateCorrectnessTest extends TestKit(ActorSystem("Hud
 
     "move to Continuing state, when the player answers after having paused a game" in {
 
-      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor.props,"RecorderActorForTest-5")
+      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor(true, gameSession),"RecorderActorForTest-5")
 
       val testProbe = TestProbe()
       gamePlayRecorderActor ! SubscribeTransitionCallBack(testProbe.ref)
@@ -154,7 +154,7 @@ class GamePlayRecorderActorStateCorrectnessTest extends TestKit(ActorSystem("Hud
 
   "time out and end the game forcefully, when the player answers one question and then doesn't any more" in {
 
-    val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor.props,"RecorderActorForTest-6")
+    val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor(true, gameSession),"RecorderActorForTest-6")
 
     val testProbe = TestProbe()
     gamePlayRecorderActor ! SubscribeTransitionCallBack(testProbe.ref)
@@ -173,6 +173,6 @@ class GamePlayRecorderActorStateCorrectnessTest extends TestKit(ActorSystem("Hud
          Transition(gamePlayRecorderActor, GameIsPausedState,     GameIsContinuingState),
          Transition(gamePlayRecorderActor, GameIsContinuingState, GameIsWrappingUpState)
     )
-  }*/
   }
+
 }

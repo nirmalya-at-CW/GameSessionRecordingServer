@@ -29,10 +29,6 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
   with ImplicitSender
   with StopSystemAfterAll {
 
-  10.milliseconds.dilated
-
-  //val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor.props,"RecorderActorForTest")
-
   val redisClient = new RedisClient("127.0.0.1", 6379)
 
   val keyPrefix = "HuddleGame-Test-RedisData-"
@@ -51,24 +47,13 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
 
   "A Huddle GamePlay Actor" must {
 
-    "try rnunning parent" in {
-
-      val p = system.actorOf(GameSessionSPOCActor.props, "ExperimentalParent")
-
-      p ! Fire
-
-      Thread.sleep(60 * 1000)
-
-      assert (1 == 1)
-    }
-
-    /*"store (Created,Started) tuples, in that order, in a history of a game session"  in {
+    "store (Created,Started) tuples, in that order, in a history of a game session"  in {
 
       val actorName =  "RecorderActorForTest-1"
 
       val gameSession = GameSession(keyPrefix + actorName, "Player-01")
 
-      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor.props,actorName)
+      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor(true, gameSession),actorName)
 
       gamePlayRecorderActor ! HuddleGame.EvStarted(gameStartsAt, gameSession)
 
@@ -91,16 +76,15 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
 
       }
 
-    }*/
+    }
 
-    /*
     "store (Created,Started,Played,Paused,Played,Ended) tuples, in that order, in a history of a game session" in {
 
       val actorName =  "RecorderActorForTest-3"
 
       val gameSession = GameSession(keyPrefix + actorName, "Player-01")
 
-      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor.props,actorName)
+      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor(true, gameSession),actorName)
 
       gamePlayRecorderActor ! HuddleGame.EvStarted(gameStartsAt, gameSession)
       expectMsg(RecordingStatus(s"Game session ($gameSession), start recorded"))
@@ -174,7 +158,7 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
 
       val gameSession = GameSession(keyPrefix + "-" + actorName, "Player-01")
 
-      val gamePlayRecorderActor = system.actorOf(Props(new GamePlayRecorderActor(true)),actorName)
+      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor(true, gameSession),actorName)
 
       gamePlayRecorderActor ! HuddleGame.EvStarted(gameStartsAt, gameSession)
       expectMsg(RecordingStatus(s"Game session ($gameSession), start recorded"))
@@ -240,7 +224,7 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
 
       val gameSession = GameSession(keyPrefix + "-" + actorName, "Player-01")
 
-      val gamePlayRecorderActor = system.actorOf(Props(new GamePlayRecorderActor(true)),actorName)
+      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor(true, gameSession),actorName)
 
       gamePlayRecorderActor ! HuddleGame.EvStarted(gameStartsAt, gameSession)
       expectMsg(RecordingStatus(s"Game session ($gameSession), start recorded"))
@@ -303,36 +287,5 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
 
     }
 
-    /*"move to Continuing state, when the player answers after having paused a game" in {
-
-      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor.props,"RecorderActorForTest-5")
-
-      val testProbe = TestProbe()
-      gamePlayRecorderActor ! SubscribeTransitionCallBack(testProbe.ref)
-      testProbe.expectMsgPF() {
-        case CurrentState(_, GameYetToStartState) => true
-      }
-
-      gamePlayRecorderActor  ! HuddleGame.EvStarted(gameStartsAt,gameSession)
-
-      testProbe.expectMsgPF(2 second) {
-        case Transition(_, GameYetToStartState, GameHasStartedState) => true
-      }
-
-      gamePlayRecorderActor ! HuddleGame.EvPaused(gameStartsAt + 2, "Paused By Player", gameSession)
-
-      testProbe.expectMsgPF(2 second) {
-        case Transition(_, GameHasStartedState, GameIsPausedState) => true
-      }
-
-      gamePlayRecorderActor ! HuddleGame.EvQuestionAnswered(gameStartsAt + 4, questionaAndAnswers(3), gameSession)
-
-      testProbe.expectMsgPF(2 second) {
-        case Transition(_, GameIsPausedState, GameIsContinuingState) => true
-      }
-
-    }*/
-
-    */
   }
 }
