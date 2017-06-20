@@ -2,9 +2,11 @@ package example.org.nirmalya.experiments
 
 import java.util.UUID
 
-
+import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.ExternalAPIParams.REQStartAGameWith
 import org.json4s.{DefaultFormats, Formats, ShortTypeHints}
 import org.json4s.native.Serialization
+
+import de.heikoseeberger.akkahttpjson4s.Json4sSupport
 
 /**
   * Created by nirmalya on 5/6/17.
@@ -12,7 +14,18 @@ import org.json4s.native.Serialization
 
 
 
-object protocol {
+object GameSessionHandlingServiceProtocol {
+
+  object ExternalAPIParams {
+
+    case class REQStartAGameWith(company: String, manager: String, playerID: String, gameName: String, gameUUID: String) {
+      override def toString = company + "." + manager + "." + "playerID" + "." + gameName + "." + gameUUID
+    }
+    case class REQPlayAGameWith(sessionID: String, questionID: String, answerID: String, isCorrect: Boolean, score: Int)
+    case class REQPauseAGameWith(sessionID: String)
+    case class REQEndAGameWith(sessionID: String)
+    case class RESPFromGameSession(desc: String)
+  }
 
   sealed trait GameEndingReason
   case object  GameEndedByPlayer extends GameEndingReason
@@ -22,7 +35,9 @@ object protocol {
   case class GameChosen(company: String, manager: String, playerID: String, gameName: String)
   case class QuestionAnswerTuple(questionID: Int, answerID: Int, isCorrect: Boolean, points: Int)
 
-  case class GameSession(sessionID: String, playerID: String)
+  case class GameSession(sessionID: String, playerID: String) {
+    override def toString = sessionID
+  }
 
   sealed trait GameInfoTupleInREDIS
 
@@ -43,7 +58,10 @@ object protocol {
         classOf[GamePlayTupleInREDIS],
         classOf[GamePausedTupleInREDIS],
         classOf[QuestionAnswerTuple],
-        classOf[GameEndedTupleInREDIS]
+        classOf[GameEndedTupleInREDIS],
+        classOf[GameChosen],
+        classOf[REQStartAGameWith],
+        classOf[RecordingStatus]
       )
     )
   )

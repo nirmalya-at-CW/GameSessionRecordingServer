@@ -5,7 +5,9 @@ lazy val root = (project in file(".")).
     inThisBuild(List(
       organization := "Redissson-experiments",
       scalaVersion := "2.11.8",
-      version      := "0.1.0-SNAPSHOT"
+      version      := "0.1.0-SNAPSHOT",
+      resolvers ++= Seq("Typesafe Repository" at "http://repo.typesafe.com/typesafe/releases/",
+        Resolver.bintrayRepo("hseeberger", "maven"))
     )),
     name := "EventReaderFromRedis",
     libraryDependencies += scalaTest % Test,
@@ -14,9 +16,8 @@ lazy val root = (project in file(".")).
     libraryDependencies += "org.json4s" % "json4s-native_2.11" % "3.5.2",
 
     libraryDependencies += "org.json4s" % "json4s-ext_2.11" % "3.5.2",
-
-
-    libraryDependencies += "com.typesafe.play" % "play-json_2.11" % "2.5.0",
+    libraryDependencies += "de.heikoseeberger" %% "akka-http-json4s" % "1.16.0",
+    libraryDependencies +=  "com.typesafe.akka" %% "akka-http" % "10.0.7",
     libraryDependencies += "com.typesafe.akka" %% "akka-actor" % "2.5.2",
     libraryDependencies +="com.typesafe.akka" %% "akka-testkit" % "2.5.2",
     libraryDependencies +="com.typesafe.akka" %% "akka-stream" % "2.5.2",

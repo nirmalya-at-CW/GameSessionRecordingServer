@@ -6,9 +6,10 @@ import akka.actor.FSM.{CurrentState, SubscribeTransitionCallBack, Transition}
 import akka.actor.{ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import example.org.nirmalya.experiments.GamePlayRecorderActor
-import example.org.nirmalya.experiments.protocol.{GameSession, HuddleGame, QuestionAnswerTuple}
-import example.org.nirmalya.experiments.protocol.HuddleGame.{GameHasStarted, GameIsContinuing, GameIsPaused, GameYetToStart}
+import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.{GameSession, HuddleGame, QuestionAnswerTuple}
+import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.HuddleGame._
 import org.nirmalya.experiment.common.StopSystemAfterAll
+import org.scalatest.time.Second
 import org.scalatest.{BeforeAndAfterAll, MustMatchers, WordSpecLike}
 
 import scala.language.postfixOps
@@ -18,7 +19,7 @@ import scala.concurrent.duration._
 /**
   * Created by nirmalya on 11/6/17.
   */
-class GamePlayRecorderActorTest extends TestKit(ActorSystem("HuddleGame-system"))
+class GamePlayRecorderActorStateCorrectnessTest extends TestKit(ActorSystem("HuddleGame-system"))
   with WordSpecLike
   with MustMatchers
   with BeforeAndAfterAll
@@ -41,7 +42,7 @@ class GamePlayRecorderActorTest extends TestKit(ActorSystem("HuddleGame-system")
 
   "A Huddle GamePlay Actor" must {
 
-    "be at state when game is yet to start" in {
+    /* "be at state when game is yet to start" in {
 
       val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor.props,"RecorderActorForTest-1")
 
@@ -50,7 +51,7 @@ class GamePlayRecorderActorTest extends TestKit(ActorSystem("HuddleGame-system")
       gamePlayRecorderActor ! SubscribeTransitionCallBack(testProbe.ref)
 
       testProbe.expectMsgPF() {
-        case CurrentState(_, GameYetToStart) => true
+        case CurrentState(_, GameYetToStartState) => true
       }
     }
 
@@ -62,13 +63,13 @@ class GamePlayRecorderActorTest extends TestKit(ActorSystem("HuddleGame-system")
       gamePlayRecorderActor ! SubscribeTransitionCallBack(testProbe.ref)
 
       testProbe.expectMsgPF() {
-        case CurrentState(_, GameYetToStart) => true
+        case CurrentState(_, GameYetToStartState) => true
       }
 
-      gamePlayRecorderActor ! HuddleGame.Started(gameStartsAt, gameSession)
+      gamePlayRecorderActor ! HuddleGame.EvStarted(gameStartsAt, gameSession)
 
       testProbe.expectMsgPF(2 second) {
-        case Transition(_, GameYetToStart, GameHasStarted) => true
+        case Transition(_, GameYetToStartState, GameHasStartedState) => true
       }
     }
 
@@ -80,19 +81,19 @@ class GamePlayRecorderActorTest extends TestKit(ActorSystem("HuddleGame-system")
       gamePlayRecorderActor ! SubscribeTransitionCallBack(testProbe.ref)
 
       testProbe.expectMsgPF() {
-        case CurrentState(_, GameYetToStart) => true
+        case CurrentState(_, GameYetToStartState) => true
       }
 
-      gamePlayRecorderActor ! HuddleGame.Started(gameStartsAt, gameSession)
+      gamePlayRecorderActor ! HuddleGame.EvStarted(gameStartsAt, gameSession)
 
       testProbe.expectMsgPF(2 second) {
-        case Transition(_, GameYetToStart, GameHasStarted) => true
+        case Transition(_, GameYetToStartState, GameHasStartedState) => true
       }
 
-      gamePlayRecorderActor ! HuddleGame.QuestionAnswered(gameStartsAt + 2, questionaAndAnswers(0), gameSession)
+      gamePlayRecorderActor ! HuddleGame.EvQuestionAnswered(gameStartsAt + 2, questionaAndAnswers(0), gameSession)
 
       testProbe.expectMsgPF(2 second) {
-        case Transition(_, GameHasStarted, GameIsContinuing) => true
+        case Transition(_, GameHasStartedState, GameIsContinuingState) => true
       }
 
     }
@@ -104,19 +105,19 @@ class GamePlayRecorderActorTest extends TestKit(ActorSystem("HuddleGame-system")
       val testProbe = TestProbe()
       gamePlayRecorderActor ! SubscribeTransitionCallBack(testProbe.ref)
       testProbe.expectMsgPF() {
-        case CurrentState(_, GameYetToStart) => true
+        case CurrentState(_, GameYetToStartState) => true
       }
 
-      gamePlayRecorderActor  ! HuddleGame.Started(gameStartsAt,gameSession)
+      gamePlayRecorderActor  ! HuddleGame.EvStarted(gameStartsAt,gameSession)
 
       testProbe.expectMsgPF(2 second) {
-        case Transition(_, GameYetToStart, GameHasStarted) => true
+        case Transition(_, GameYetToStartState, GameHasStartedState) => true
       }
 
-      gamePlayRecorderActor ! HuddleGame.Paused(gameStartsAt + 2, "Paused By Player", gameSession)
+      gamePlayRecorderActor ! HuddleGame.EvPaused(gameStartsAt + 2, gameSession)
 
       testProbe.expectMsgPF(2 second) {
-        case Transition(_, GameHasStarted, GameIsPaused) => true
+        case Transition(_, GameHasStartedState, GameIsPausedState) => true
       }
     }
 
@@ -127,27 +128,51 @@ class GamePlayRecorderActorTest extends TestKit(ActorSystem("HuddleGame-system")
       val testProbe = TestProbe()
       gamePlayRecorderActor ! SubscribeTransitionCallBack(testProbe.ref)
       testProbe.expectMsgPF() {
-        case CurrentState(_, GameYetToStart) => true
+        case CurrentState(_, GameYetToStartState) => true
       }
 
-      gamePlayRecorderActor  ! HuddleGame.Started(gameStartsAt,gameSession)
+      gamePlayRecorderActor  ! HuddleGame.EvStarted(gameStartsAt,gameSession)
 
       testProbe.expectMsgPF(2 second) {
-        case Transition(_, GameYetToStart, GameHasStarted) => true
+        case Transition(_, GameYetToStartState, GameHasStartedState) => true
       }
 
-      gamePlayRecorderActor ! HuddleGame.Paused(gameStartsAt + 2, "Paused By Player", gameSession)
+      gamePlayRecorderActor ! HuddleGame.EvPaused(gameStartsAt + 2, gameSession)
 
       testProbe.expectMsgPF(2 second) {
-        case Transition(_, GameHasStarted, GameIsPaused) => true
+        case Transition(_, GameHasStartedState, GameIsPausedState) => true
       }
 
-      gamePlayRecorderActor ! HuddleGame.QuestionAnswered(gameStartsAt + 4, questionaAndAnswers(3), gameSession)
+      gamePlayRecorderActor ! HuddleGame.EvQuestionAnswered(gameStartsAt + 4, questionaAndAnswers(3), gameSession)
 
       testProbe.expectMsgPF(2 second) {
-        case Transition(_, GameIsPaused, GameIsContinuing) => true
+        case Transition(_, GameIsPausedState, GameIsContinuingState) => true
       }
 
     }
+  }
+
+  "time out and end the game forcefully, when the player answers one question and then doesn't any more" in {
+
+    val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor.props,"RecorderActorForTest-6")
+
+    val testProbe = TestProbe()
+    gamePlayRecorderActor ! SubscribeTransitionCallBack(testProbe.ref)
+    testProbe.expectMsgPF(1 second) {
+      case CurrentState(_, GameYetToStartState) => true
+    }
+
+    gamePlayRecorderActor  ! HuddleGame.EvStarted(gameStartsAt,gameSession)
+    gamePlayRecorderActor ! HuddleGame.EvPaused(gameStartsAt + 2, gameSession)
+    gamePlayRecorderActor ! HuddleGame.EvQuestionAnswered(gameStartsAt + 4, questionaAndAnswers(3), gameSession)
+
+    testProbe.expectMsgAllOf(
+         6 seconds, // Assuming the timeout duration for a game is 5 seconds!
+         Transition(gamePlayRecorderActor, GameYetToStartState,   GameHasStartedState),
+         Transition(gamePlayRecorderActor, GameHasStartedState,   GameIsPausedState),
+         Transition(gamePlayRecorderActor, GameIsPausedState,     GameIsContinuingState),
+         Transition(gamePlayRecorderActor, GameIsContinuingState, GameIsWrappingUpState)
+    )
+  }*/
   }
 }

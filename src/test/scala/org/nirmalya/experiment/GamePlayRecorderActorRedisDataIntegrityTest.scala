@@ -1,33 +1,42 @@
 package org.nirmalya.experiment
 
-import java.util.UUID
-
-import akka.actor.FSM.{CurrentState, SubscribeTransitionCallBack, Transition}
 import akka.actor.{ActorSystem, Props}
-import akka.testkit.{ImplicitSender, TestKit, TestProbe}
-import example.org.nirmalya.experiments.GamePlayRecorderActor
-import example.org.nirmalya.experiments.protocol.{GameSession, HuddleGame, QuestionAnswerTuple}
-import example.org.nirmalya.experiments.protocol.HuddleGame.{GameHasStarted, GameIsContinuing, GameIsPaused, GameYetToStart}
+import akka.testkit.{ImplicitSender, TestKit}
+import org.scalatest._
+import Matchers._
+import com.redis.RedisClient
+import org.json4s.native.Serialization.{read, write}
+import org.json4s.native.Json
+import example.org.nirmalya.experiments.{Fire, GamePlayRecorderActor, GameSessionSPOCActor}
+import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.HuddleGame.{GameHasStartedState, GameIsContinuingState, GameIsPausedState, GameYetToStartState}
+import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol._
 import org.nirmalya.experiment.common.StopSystemAfterAll
 import org.scalatest.{BeforeAndAfterAll, MustMatchers, WordSpecLike}
 
-import scala.language.postfixOps
 import scala.concurrent.duration._
+import akka.testkit._
+
+import scala.language.postfixOps
 
 
 /**
   * Created by nirmalya on 11/6/17.
   */
-class GamePlayRecorderActorTest extends TestKit(ActorSystem("HuddleGame-system"))
+class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("HuddleGame-system"))
   with WordSpecLike
   with MustMatchers
   with BeforeAndAfterAll
   with ImplicitSender
   with StopSystemAfterAll {
 
+  10.milliseconds.dilated
+
   //val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor.props,"RecorderActorForTest")
 
-  val gameSession = GameSession("HuddleGame-Test-FSM", "Player-01")
+  val redisClient = new RedisClient("127.0.0.1", 6379)
+
+  val keyPrefix = "HuddleGame-Test-RedisData-"
+
   val gameStartsAt = System.currentTimeMillis()
 
   val questionaAndAnswers = IndexedSeq(
@@ -39,115 +48,291 @@ class GamePlayRecorderActorTest extends TestKit(ActorSystem("HuddleGame-system")
 
   override def beforeAll = super.beforeAll
 
+
   "A Huddle GamePlay Actor" must {
 
-    "be at state when game is yet to start" in {
+    "try rnunning parent" in {
 
-      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor.props,"RecorderActorForTest-1")
+      val p = system.actorOf(GameSessionSPOCActor.props, "ExperimentalParent")
 
-      val testProbe = TestProbe()
+      p ! Fire
 
-      gamePlayRecorderActor ! SubscribeTransitionCallBack(testProbe.ref)
+      Thread.sleep(60 * 1000)
 
-      testProbe.expectMsgPF() {
-        case CurrentState(_, GameYetToStart) => true
+      assert (1 == 1)
+    }
+
+    /*"store (Created,Started) tuples, in that order, in a history of a game session"  in {
+
+      val actorName =  "RecorderActorForTest-1"
+
+      val gameSession = GameSession(keyPrefix + actorName, "Player-01")
+
+      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor.props,actorName)
+
+      gamePlayRecorderActor ! HuddleGame.EvStarted(gameStartsAt, gameSession)
+
+      expectMsg(RecordingStatus(s"Game session ($gameSession), start recorded"))
+
+      gamePlayRecorderActor ! HuddleGame.EvGamePlayRecordSoFarRequired(gameSession)
+
+      expectMsgPF(2 second) {
+
+        case m: RecordingStatus =>
+          val sessionHistoryAsJSON = m.details
+          val completeHistory = read[CompleteGamePlaySessionHistory](sessionHistoryAsJSON)
+          completeHistory.elems.length should be (2)
+          completeHistory.elems.toIndexedSeq(0) shouldBe a [GameCreatedTupleInREDIS]
+          completeHistory.elems.toIndexedSeq(1) shouldBe a [GameStartedTupleInREDIS]
+          val aCreatedTuple = completeHistory.elems.toIndexedSeq(0).asInstanceOf[GameCreatedTupleInREDIS]
+          val aStartedTuple = completeHistory.elems.toIndexedSeq(1).asInstanceOf[GameStartedTupleInREDIS]
+          aCreatedTuple.flag should be ("Game Sentinel")
+          aStartedTuple.t shouldEqual (gameStartsAt)
+
+      }
+
+    }*/
+
+    /*
+    "store (Created,Started,Played,Paused,Played,Ended) tuples, in that order, in a history of a game session" in {
+
+      val actorName =  "RecorderActorForTest-3"
+
+      val gameSession = GameSession(keyPrefix + actorName, "Player-01")
+
+      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor.props,actorName)
+
+      gamePlayRecorderActor ! HuddleGame.EvStarted(gameStartsAt, gameSession)
+      expectMsg(RecordingStatus(s"Game session ($gameSession), start recorded"))
+
+      gamePlayRecorderActor ! HuddleGame.EvQuestionAnswered(gameStartsAt+1,questionaAndAnswers(0),gameSession)
+      expectMsg(
+        RecordingStatus(
+          s"Game session ($gameSession), question(${questionaAndAnswers(0).questionID},${questionaAndAnswers(0).answerID} recorded"))
+
+
+      gamePlayRecorderActor ! HuddleGame.EvPaused(gameStartsAt+2,gameSession)
+      expectMsg(
+        RecordingStatus(
+          s"Game session ($gameSession), Pause(${gameStartsAt+2}) recorded"))
+
+
+      gamePlayRecorderActor ! HuddleGame.EvQuestionAnswered(gameStartsAt+3,questionaAndAnswers(1),gameSession)
+      expectMsg(
+        RecordingStatus(
+          s"Game session ($gameSession), question(${questionaAndAnswers(1).questionID},${questionaAndAnswers(1).answerID} recorded"))
+
+
+      gamePlayRecorderActor ! HuddleGame.EvEnded(gameStartsAt+4,GameEndedByPlayer, gameSession)
+
+      expectMsgPF(2 second) {
+
+        case m: RecordingStatus =>
+
+          println("m.details =" + m.details)
+          m.details should be (s"Game session ($gameSession), End(${gameStartsAt+4}) recorded")
+      }
+
+      val history = redisClient.hget(gameSession, "SessionHistory")
+
+      history match {
+        case Some (v) =>
+          val completeHistory = read[CompleteGamePlaySessionHistory](v)
+          completeHistory.elems.length should be (6)
+          completeHistory.elems.toIndexedSeq(0) shouldBe a [GameCreatedTupleInREDIS]
+          completeHistory.elems.toIndexedSeq(1) shouldBe a [GameStartedTupleInREDIS]
+          completeHistory.elems.toIndexedSeq(2) shouldBe a [GamePlayTupleInREDIS]
+          completeHistory.elems.toIndexedSeq(3) shouldBe a [GamePausedTupleInREDIS]
+          completeHistory.elems.toIndexedSeq(4) shouldBe a [GamePlayTupleInREDIS]
+          completeHistory.elems.toIndexedSeq(5) shouldBe a [GameEndedTupleInREDIS]
+
+          val aCreatedTuple = completeHistory.elems.toIndexedSeq(0).asInstanceOf[GameCreatedTupleInREDIS]
+          aCreatedTuple.flag should be ("Game Sentinel")
+
+          val aStartedTuple = completeHistory.elems.toIndexedSeq(1).asInstanceOf[GameStartedTupleInREDIS]
+          aStartedTuple.t shouldEqual (gameStartsAt)
+
+          val aPlayTuple1 = completeHistory.elems.toIndexedSeq(2).asInstanceOf[GamePlayTupleInREDIS]
+          aPlayTuple1.questionAnswer shouldEqual (questionaAndAnswers(0))
+
+          val aPlayPausedTuple = completeHistory.elems.toIndexedSeq(3).asInstanceOf[GamePausedTupleInREDIS]
+          aPlayPausedTuple.t shouldEqual (gameStartsAt+2)
+
+          val aPlayTuple2 = completeHistory.elems.toIndexedSeq(4).asInstanceOf[GamePlayTupleInREDIS]
+          aPlayTuple2.questionAnswer shouldEqual (questionaAndAnswers(1))
+
+          val anEndedTuple = completeHistory.elems.toIndexedSeq(5).asInstanceOf[GameEndedTupleInREDIS]
+          anEndedTuple shouldEqual (GameEndedTupleInREDIS(gameStartsAt+4, GameEndedByPlayer.toString))
+
+      }
+
+    }
+
+    "ignore successive Pause, in a history of a game session" in {
+
+      val actorName =  "RecorderActorForTest-4"
+
+      val gameSession = GameSession(keyPrefix + "-" + actorName, "Player-01")
+
+      val gamePlayRecorderActor = system.actorOf(Props(new GamePlayRecorderActor(true)),actorName)
+
+      gamePlayRecorderActor ! HuddleGame.EvStarted(gameStartsAt, gameSession)
+      expectMsg(RecordingStatus(s"Game session ($gameSession), start recorded"))
+
+      gamePlayRecorderActor ! HuddleGame.EvQuestionAnswered(gameStartsAt+1,questionaAndAnswers(0),gameSession)
+      expectMsg(
+        RecordingStatus(
+          s"Game session ($gameSession), question(${questionaAndAnswers(0).questionID},${questionaAndAnswers(0).answerID} recorded"))
+
+
+      gamePlayRecorderActor ! HuddleGame.EvPaused(gameStartsAt+2,gameSession)
+      expectMsg(
+        RecordingStatus(
+          s"Game session ($gameSession), Pause(${gameStartsAt+2}) recorded"))
+
+      // Successive Pause, will be ignored by the GameSession's FSM
+      gamePlayRecorderActor ! HuddleGame.EvPaused(gameStartsAt+3,gameSession)
+      expectNoMsg(2 second)
+
+      gamePlayRecorderActor ! HuddleGame.EvEnded(gameStartsAt+4,GameEndedByPlayer, gameSession)
+
+      expectMsgPF(2 second) {
+
+        case m: RecordingStatus =>
+          m.details should be (s"Game session ($gameSession), End(${gameStartsAt+4}) recorded")
+      }
+
+      val history = redisClient.hget(gameSession, "SessionHistory")
+
+      history match {
+        case Some (v) =>
+          val completeHistory = read[CompleteGamePlaySessionHistory](v)
+          completeHistory.elems.length should be (5)
+          completeHistory.elems.toIndexedSeq(0) shouldBe a [GameCreatedTupleInREDIS]
+          completeHistory.elems.toIndexedSeq(1) shouldBe a [GameStartedTupleInREDIS]
+          completeHistory.elems.toIndexedSeq(2) shouldBe a [GamePlayTupleInREDIS]
+          completeHistory.elems.toIndexedSeq(3) shouldBe a [GamePausedTupleInREDIS]
+          completeHistory.elems.toIndexedSeq(4) shouldBe a [GameEndedTupleInREDIS]
+
+          val aCreatedTuple = completeHistory.elems.toIndexedSeq(0).asInstanceOf[GameCreatedTupleInREDIS]
+          aCreatedTuple.flag should be ("Game Sentinel")
+
+          val aStartedTuple = completeHistory.elems.toIndexedSeq(1).asInstanceOf[GameStartedTupleInREDIS]
+          aStartedTuple.t shouldEqual (gameStartsAt)
+
+          val aPlayTuple1 = completeHistory.elems.toIndexedSeq(2).asInstanceOf[GamePlayTupleInREDIS]
+          aPlayTuple1.questionAnswer shouldEqual (questionaAndAnswers(0))
+
+          val aPlayPausedTuple = completeHistory.elems.toIndexedSeq(3).asInstanceOf[GamePausedTupleInREDIS]
+          aPlayPausedTuple.t shouldEqual (gameStartsAt+2)
+
+          val anEndedTuple = completeHistory.elems.toIndexedSeq(4).asInstanceOf[GameEndedTupleInREDIS]
+          anEndedTuple shouldEqual (GameEndedTupleInREDIS(gameStartsAt+4, GameEndedByPlayer.toString))
+
+        case None => 0 shouldEqual (1) // Here, we want to know if there is a failure!
+
       }
     }
 
-    "go to STARTed state, after game starts" in {
+    "time out and end the game forcefully, after remaining at Paused state for more than a specified duration" in {
 
-      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor.props,"RecorderActorForTest-2")
+      val actorName =  "RecorderActorForTest-5"
 
-      val testProbe = TestProbe()
-      gamePlayRecorderActor ! SubscribeTransitionCallBack(testProbe.ref)
+      val gameSession = GameSession(keyPrefix + "-" + actorName, "Player-01")
 
-      testProbe.expectMsgPF() {
-        case CurrentState(_, GameYetToStart) => true
+      val gamePlayRecorderActor = system.actorOf(Props(new GamePlayRecorderActor(true)),actorName)
+
+      gamePlayRecorderActor ! HuddleGame.EvStarted(gameStartsAt, gameSession)
+      expectMsg(RecordingStatus(s"Game session ($gameSession), start recorded"))
+
+      gamePlayRecorderActor ! HuddleGame.EvQuestionAnswered(gameStartsAt+1,questionaAndAnswers(0),gameSession)
+      expectMsg(
+        RecordingStatus(
+          s"Game session ($gameSession), question(${questionaAndAnswers(0).questionID},${questionaAndAnswers(0).answerID} recorded"))
+
+
+      gamePlayRecorderActor ! HuddleGame.EvPaused(gameStartsAt+2,gameSession)
+      expectMsg(
+        RecordingStatus(
+          s"Game session ($gameSession), Pause(${gameStartsAt+2}) recorded"))
+
+      awaitCond(
+        {
+          val history = redisClient.hget(gameSession, "SessionHistory")
+
+          history match {
+            case Some(v) =>
+              val completeHistory = read[CompleteGamePlaySessionHistory](v)
+              completeHistory.elems.length == 5
+            case None =>
+              false
+          }
+        }, 20 seconds, 5 seconds, "REDIS"
+      )
+
+      val history = redisClient.hget(gameSession, "SessionHistory")
+
+      history match {
+        case Some(v) =>
+          val completeHistory = read[CompleteGamePlaySessionHistory](v)
+          completeHistory.elems.length should be(5)
+          completeHistory.elems.toIndexedSeq(0) shouldBe a[GameCreatedTupleInREDIS]
+          completeHistory.elems.toIndexedSeq(1) shouldBe a[GameStartedTupleInREDIS]
+          completeHistory.elems.toIndexedSeq(2) shouldBe a[GamePlayTupleInREDIS]
+          completeHistory.elems.toIndexedSeq(3) shouldBe a[GamePausedTupleInREDIS]
+          completeHistory.elems.toIndexedSeq(4) shouldBe a[GameEndedTupleInREDIS]
+
+          val aCreatedTuple = completeHistory.elems.toIndexedSeq(0).asInstanceOf[GameCreatedTupleInREDIS]
+          aCreatedTuple.flag should be("Game Sentinel")
+
+          val aStartedTuple = completeHistory.elems.toIndexedSeq(1).asInstanceOf[GameStartedTupleInREDIS]
+          aStartedTuple.t shouldEqual (gameStartsAt)
+
+          val aPlayTuple1 = completeHistory.elems.toIndexedSeq(2).asInstanceOf[GamePlayTupleInREDIS]
+          aPlayTuple1.questionAnswer shouldEqual (questionaAndAnswers(0))
+
+          val aPlayPausedTuple = completeHistory.elems.toIndexedSeq(3).asInstanceOf[GamePausedTupleInREDIS]
+          aPlayPausedTuple.t shouldEqual (gameStartsAt + 2)
+
+          val anEndedTuple = completeHistory.elems.toIndexedSeq(4).asInstanceOf[GameEndedTupleInREDIS]
+          anEndedTuple.gameEndingReason should be(GameEndedByTimeOut.toString)
+
+        case None => 0 shouldEqual (1) // Here, we want to know if there is a failure!
+
       }
 
-      gamePlayRecorderActor ! HuddleGame.Started(gameStartsAt, gameSession)
-
-      testProbe.expectMsgPF(2 second) {
-        case Transition(_, GameYetToStart, GameHasStarted) => true
-      }
     }
 
-    "remain at Continuing state, when the player answers a question" in {
-
-      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor.props,"RecorderActorForTest-3")
-
-      val testProbe = TestProbe()
-      gamePlayRecorderActor ! SubscribeTransitionCallBack(testProbe.ref)
-
-      testProbe.expectMsgPF() {
-        case CurrentState(_, GameYetToStart) => true
-      }
-
-      gamePlayRecorderActor ! HuddleGame.Started(gameStartsAt, gameSession)
-
-      testProbe.expectMsgPF(2 second) {
-        case Transition(_, GameYetToStart, GameHasStarted) => true
-      }
-
-      gamePlayRecorderActor ! HuddleGame.QuestionAnswered(gameStartsAt + 2, questionaAndAnswers(0), gameSession)
-
-      testProbe.expectMsgPF(2 second) {
-        case Transition(_, GameHasStarted, GameIsContinuing) => true
-      }
-
-    }
-
-    "remain at Paused state, when the player pauses the game after starting the game" in {
-
-      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor.props,"RecorderActorForTest-4")
-
-      val testProbe = TestProbe()
-      gamePlayRecorderActor ! SubscribeTransitionCallBack(testProbe.ref)
-      testProbe.expectMsgPF() {
-        case CurrentState(_, GameYetToStart) => true
-      }
-
-      gamePlayRecorderActor  ! HuddleGame.Started(gameStartsAt,gameSession)
-
-      testProbe.expectMsgPF(2 second) {
-        case Transition(_, GameYetToStart, GameHasStarted) => true
-      }
-
-      gamePlayRecorderActor ! HuddleGame.Paused(gameStartsAt + 2, "Paused By Player", gameSession)
-
-      testProbe.expectMsgPF(2 second) {
-        case Transition(_, GameHasStarted, GameIsPaused) => true
-      }
-    }
-
-    "move to Continuing state, when the player answers after having paused a game" in {
+    /*"move to Continuing state, when the player answers after having paused a game" in {
 
       val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor.props,"RecorderActorForTest-5")
 
       val testProbe = TestProbe()
       gamePlayRecorderActor ! SubscribeTransitionCallBack(testProbe.ref)
       testProbe.expectMsgPF() {
-        case CurrentState(_, GameYetToStart) => true
+        case CurrentState(_, GameYetToStartState) => true
       }
 
-      gamePlayRecorderActor  ! HuddleGame.Started(gameStartsAt,gameSession)
+      gamePlayRecorderActor  ! HuddleGame.EvStarted(gameStartsAt,gameSession)
 
       testProbe.expectMsgPF(2 second) {
-        case Transition(_, GameYetToStart, GameHasStarted) => true
+        case Transition(_, GameYetToStartState, GameHasStartedState) => true
       }
 
-      gamePlayRecorderActor ! HuddleGame.Paused(gameStartsAt + 2, "Paused By Player", gameSession)
+      gamePlayRecorderActor ! HuddleGame.EvPaused(gameStartsAt + 2, "Paused By Player", gameSession)
 
       testProbe.expectMsgPF(2 second) {
-        case Transition(_, GameHasStarted, GameIsPaused) => true
+        case Transition(_, GameHasStartedState, GameIsPausedState) => true
       }
 
-      gamePlayRecorderActor ! HuddleGame.QuestionAnswered(gameStartsAt + 4, questionaAndAnswers(3), gameSession)
+      gamePlayRecorderActor ! HuddleGame.EvQuestionAnswered(gameStartsAt + 4, questionaAndAnswers(3), gameSession)
 
       testProbe.expectMsgPF(2 second) {
-        case Transition(_, GameIsPaused, GameIsContinuing) => true
+        case Transition(_, GameIsPausedState, GameIsContinuingState) => true
       }
 
-    }
+    }*/
+
+    */
   }
 }
