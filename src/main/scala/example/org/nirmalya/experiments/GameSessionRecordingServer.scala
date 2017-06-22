@@ -11,7 +11,7 @@ import akka.stream.{ActorMaterializer, Materializer}
 import org.json4s.{DefaultFormats, Formats, ShortTypeHints, native}
 import org.json4s.native.Serialization
 import de.heikoseeberger.akkahttpjson4s.Json4sSupport
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.ExternalAPIParams.REQStartAGameWith
+import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.ExternalAPIParams.{REQPauseAGameWith, REQPlayAGameWith, REQStartAGameWith}
 import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.RecordingStatus
 
 import scala.concurrent.Future
@@ -25,70 +25,111 @@ import scala.concurrent.duration.Duration
   */
 object GameSessionRecordingServer {
 
+  implicit val system = ActorSystem()
+  implicit val materializer = ActorMaterializer()
+  implicit val executionContext = system.dispatcher
+  implicit val askTimeOutDuration:Timeout = Duration(3, "seconds")
+
+  val sessionHandlingSPOC = system.actorOf(GameSessionSPOCActor.props, "SPOC")
 
   def main(args: Array[String]) {
-    implicit val system = ActorSystem()
-    implicit val materializer = ActorMaterializer()
-    // needed for the future foreach in the end
-    implicit val executionContext = system.dispatcher
-
-    val sessionHandlingSPOC = system.actorOf(GameSessionSPOCActor.props, "SPOC")
-
-
 
     val special = Logging(system, "SpecialRoutes")
 
+    val route: Route = startRoute ~ playRoute ~ pauseRoute ~ endRoute
 
-    import de.heikoseeberger.akkahttpjson4s.Json4sSupport._
-    import GameSessionHandlingServiceProtocol._
-    import GameSessionHandlingServiceProtocol.formats_2
-    implicit val serialization = native.Serialization // or native.Serialization
-    implicit val formats       = DefaultFormats
-
-    implicit val askTimeOutDuration:Timeout = Duration(3, "seconds")
-    def firstToute(implicit mat: Materializer) = {
-      import akka.http.scaladsl.server.Directives._
-      import Json4sSupport._
-
-      implicit val serialization = native.Serialization
-      implicit val formats       = DefaultFormats
-
-        post {
-          logRequest("StartRequest") {
-            pathPrefix("start") {
-              entity(as[REQStartAGameWith]) { reqStartAGameWith =>
-                complete {
-                  println(s"req: $reqStartAGameWith")
-                  (sessionHandlingSPOC ? reqStartAGameWith).mapTo[RecordingStatus]
-                  //r
-                }
-              }
-            }
-          }
-      }
-    }
-
-    // let's say the OS won't allow us to bind to 80.
     val (host, port) = ("localhost", 9090)
     val bindingFuture: Future[ServerBinding] =
-      Http().bindAndHandle(firstToute, host, port)
+      Http().bindAndHandle(startRoute, host, port)
 
     bindingFuture.failed.foreach { ex =>
       println(ex, "Failed to bind to {}:{}!", host, port)
     }
   }
 
-  /*import GameSessionHandlingServiceProtocol._
-  val gameStartRout: Route =
+  def startRoute(implicit mat: Materializer) = {
+    import akka.http.scaladsl.server.Directives._
+    import Json4sSupport._
+
+    implicit val serialization = native.Serialization
+    implicit val formats       = DefaultFormats
+
+    // TODO: I still don't know how to log the HTTP Requests and Responses, by using Directives!
     post {
-      decodeRequest {
-        // unmarshal with in-scope unmarshaller
-        entity(as[REQStartAGameWith]) { reqStartAGameWith =>
-          complete {
-            (sessionHandlingSPOC ? reqStartAGameWith).mapTo[RecordingStatus]
-            "Order received"
+      logRequest("StartRequest") {
+        pathPrefix("start") {
+          entity(as[REQStartAGameWith]) { reqStartAGameWith =>
+            complete {
+              println(s"req: $reqStartAGameWith")
+              (sessionHandlingSPOC ? reqStartAGameWith).mapTo[RecordingStatus]
+
+            }
           }
         }
       }
-    }*/
+    }
+  }
+
+  def playRoute(implicit mat: Materializer) = {
+    import akka.http.scaladsl.server.Directives._
+    import Json4sSupport._
+
+    implicit val serialization = native.Serialization
+    implicit val formats       = DefaultFormats
+
+    post {
+      logRequest("StartRequest") {
+        pathPrefix("play") {
+          entity(as[REQPlayAGameWith]) { reqPlayAGameWith =>
+            complete {
+              println(s"req: $reqPlayAGameWith")
+              (sessionHandlingSPOC ? reqPlayAGameWith).mapTo[RecordingStatus]
+            }
+          }
+        }
+      }
+    }
+  }
+
+  def pauseRoute(implicit mat: Materializer) = {
+    import akka.http.scaladsl.server.Directives._
+    import Json4sSupport._
+
+    implicit val serialization = native.Serialization
+    implicit val formats       = DefaultFormats
+
+    post {
+      logRequest("StartRequest") {
+        pathPrefix("pause") {
+          entity(as[REQPauseAGameWith]) { reqPauseAGameWith =>
+            complete {
+              println(s"req: $reqPauseAGameWith")
+              (sessionHandlingSPOC ? reqPauseAGameWith).mapTo[RecordingStatus]
+            }
+          }
+        }
+      }
+    }
+  }
+
+  def endRoute(implicit mat: Materializer) = {
+    import akka.http.scaladsl.server.Directives._
+    import Json4sSupport._
+
+    implicit val serialization = native.Serialization
+    implicit val formats       = DefaultFormats
+
+    post {
+      logRequest("StartRequest") {
+        pathPrefix("end") {
+          entity(as[REQPauseAGameWith]) { reqPauseAGameWith =>
+            complete {
+              println(s"req: $reqPauseAGameWith")
+              (sessionHandlingSPOC ? reqPauseAGameWith).mapTo[RecordingStatus]
+            }
+          }
+        }
+      }
+    }
+  }
 }
