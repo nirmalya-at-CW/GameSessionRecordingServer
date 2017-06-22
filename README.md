@@ -40,3 +40,4 @@ session-related transient data.
 * If it is being run for the first time, sbt will download a number of dependent JARs. Ensure that you are connected to
  'Net and be patient. The whole process may take time.
 * If everything goes fine, then the HTTP Server will keep running on _localhost_ , at _port_ 9090.
+* It is assumed that a REDIS Server instance is running locally, at the default port.
