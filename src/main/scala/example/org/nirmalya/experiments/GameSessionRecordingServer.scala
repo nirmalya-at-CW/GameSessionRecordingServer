@@ -40,7 +40,7 @@ object GameSessionRecordingServer {
 
     val (host, port) = ("localhost", 9090)
     val bindingFuture: Future[ServerBinding] =
-      Http().bindAndHandle(startRoute, host, port)
+      Http().bindAndHandle(route, host, port)
 
     bindingFuture.failed.foreach { ex =>
       println(ex, "Failed to bind to {}:{}!", host, port)

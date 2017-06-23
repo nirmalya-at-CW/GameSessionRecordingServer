@@ -25,7 +25,7 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean, val seededWithSession:
 
   val redisClient = new RedisClient("127.0.0.1", 6379)
 
-  val maxGameTimeout = Duration(5, TimeUnit.SECONDS)
+  val maxGameTimeout = Duration(12, TimeUnit.SECONDS)
   //config.useSingleServer().setAddress("127.0.0.1:6379")
 
    startWith(GameYetToStartState, DataToBeginWith)
@@ -113,7 +113,6 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean, val seededWithSession:
 
     case Event(StateTimeout, sessionReqdForCleaningUp:DataToCleanUpRedis)  =>
 
-      log.info("In PuasedState, time out occurred.. writing record to REDIS")
       recordEndOfTheGame(System.currentTimeMillis, GameEndedByTimeOut, sessionReqdForCleaningUp.gameSession)
       self ! HuddleGame.EvCleanUpRequired (sessionReqdForCleaningUp.gameSession)
       goto (HuddleGame.GameIsWrappingUpState)

@@ -6,7 +6,7 @@ import org.scalatest._
 import Matchers._
 import com.redis.RedisClient
 import org.json4s.native.Serialization.{read, write}
-import org.json4s.native.Json
+
 import example.org.nirmalya.experiments.{Fire, GamePlayRecorderActor, GameSessionSPOCActor}
 import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.HuddleGame.{GameHasStartedState, GameIsContinuingState, GameIsPausedState, GameYetToStartState}
 import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol._

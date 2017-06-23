@@ -20,21 +20,21 @@ class GameSessionSPOCActor extends Actor with ActorLogging {
   implicit val executionContext = context.dispatcher
   implicit val askTimeOutDuration:Timeout = Duration(3, "seconds")
 
-  var activeGameSessionActors: Map[GameSession, ActorRef] = Map.empty
+  var activeGameSessionActors: Map[String, ActorRef] = Map.empty
 
   def receive = {
 
     case r: ExternalAPIParams.REQStartAGameWith =>
       val gameSession = GameSession(r.toString, "Ignore")
 
-      if (activeGameSessionActors.isDefinedAt(gameSession))
+      if (activeGameSessionActors.isDefinedAt(r.toString))
         sender ! RecordingStatus(s"GameSession with $r is already active.")
       else {
         val originalSender = sender()
-        val child = context.system.actorOf(GamePlayRecorderActor(true, gameSession), gameSession.toString)
+        val child = context.actorOf(GamePlayRecorderActor(true, gameSession), gameSession.toString)
         context.watch(child)
 
-        activeGameSessionActors = activeGameSessionActors + Tuple2(gameSession,child)
+        activeGameSessionActors = activeGameSessionActors + Tuple2(r.toString,child)
 
 
         val confirmation = (child ? HuddleGame.EvStarted(System.currentTimeMillis(), gameSession)).mapTo[RecordingStatus]
@@ -45,10 +45,12 @@ class GameSessionSPOCActor extends Actor with ActorLogging {
       }
 
     case r: ExternalAPIParams.REQPlayAGameWith =>
+
       val gameSession = GameSession(r.sessionID, "Ignore")
 
+
       val originalSender = sender()
-      activeGameSessionActors.get(gameSession) match {
+      activeGameSessionActors.get(r.sessionID) match {
 
         case Some (sessionActor) =>
 
@@ -71,7 +73,7 @@ class GameSessionSPOCActor extends Actor with ActorLogging {
       val gameSession = GameSession(r.sessionID, "Ignore")
 
       val originalSender = sender()
-      activeGameSessionActors.get(gameSession) match {
+      activeGameSessionActors.get(r.sessionID) match {
 
         case Some (sessionActor) =>
 
@@ -89,7 +91,7 @@ class GameSessionSPOCActor extends Actor with ActorLogging {
       val gameSession = GameSession(r.sessionID, "Ignore")
 
       val originalSender = sender()
-      activeGameSessionActors.get(gameSession) match {
+      activeGameSessionActors.get(r.sessionID) match {
 
         case Some (sessionActor) =>
 
@@ -108,10 +110,10 @@ class GameSessionSPOCActor extends Actor with ActorLogging {
 
     // TODO: Revisit the following handler. What is the best way to remember the session that the this
     // TODO: this terminated actor has been seeded with?
-    case Terminated(sessionActor: GamePlayRecorderActor) =>
+    case Terminated(sessionActor) =>
 
-      activeGameSessionActors = activeGameSessionActors - sessionActor.seededWithSession
-      log.info("Session Actor ($a) terminated." )
+      activeGameSessionActors = activeGameSessionActors - sessionActor.path.name
+      log.info(s"Session Actor ($sessionActor) terminated." )
 
 
     case (ShutYourself) =>
