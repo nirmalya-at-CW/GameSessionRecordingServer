@@ -106,3 +106,16 @@ Keys are important, values are just examples.
     }
 
 
+# _curl_ command examples
+
+### start
+curl -v -H "Content-Type: application/json" -X POST -d '{"company":"ABC","manager":"Vikas","playerID":"Nirmalya","gameName":"1Hudd","gameUUID":"A123"}' http://localhost:9090/start
+
+### play
+curl -v -H "Content-Type: application/json" -X POST -d '{"sessionID":"ABC.Vikas.playerID.1Hudd.A123","questionID":1, "answerID": 2, "isCorrect":true, "score":200}' http://localhost:9090/play
+
+### pause
+curl -v -H "Content-Type: application/json" -X POST -d '{"sessionID":"ABC.Vikas.playerID.1Hudd.A123"}' http://localhost:9090/pause
+
+### end
+curl -v -H "Content-Type: application/json" -X POST -d '{"sessionID":"ABC.Vikas.playerID.1Hudd.A123"}' http://localhost:9090/end
