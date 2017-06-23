@@ -8,13 +8,13 @@ import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.{Exte
 import scala.concurrent.duration.Duration
 import scala.util.{Failure, Success}
 
-case object Fire
-case object ShutYourself
 
 /**
   * Created by nirmalya on 20/6/17.
   */
 class GameSessionSPOCActor extends Actor with ActorLogging {
+
+  case object ShutYourself
 
 
   implicit val executionContext = context.dispatcher
@@ -34,7 +34,8 @@ class GameSessionSPOCActor extends Actor with ActorLogging {
         val child = context.actorOf(GamePlayRecorderActor(true, gameSession), gameSession.toString)
         context.watch(child)
 
-        activeGameSessionActors = activeGameSessionActors + Tuple2(r.toString,child)
+        this.activeGameSessionActors = this.activeGameSessionActors + Tuple2(r.toString,child)
+        println(activeGameSessionActors.mkString("|"))
 
 
         val confirmation = (child ? HuddleGame.EvStarted(System.currentTimeMillis(), gameSession)).mapTo[RecordingStatus]
@@ -47,7 +48,6 @@ class GameSessionSPOCActor extends Actor with ActorLogging {
     case r: ExternalAPIParams.REQPlayAGameWith =>
 
       val gameSession = GameSession(r.sessionID, "Ignore")
-
 
       val originalSender = sender()
       activeGameSessionActors.get(r.sessionID) match {
@@ -66,7 +66,7 @@ class GameSessionSPOCActor extends Actor with ActorLogging {
             case Failure(e) =>   originalSender ! RecordingStatus(e.getMessage)
           }
         case None                =>
-          originalSender ! RecordingStatus(s"No session with ${r.sessionID} exists.")
+          originalSender ! RecordingStatus(s"No **session** with ${r.sessionID} exists.")
       }
 
     case r: ExternalAPIParams.REQPauseAGameWith =>

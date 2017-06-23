@@ -61,6 +61,7 @@ object GameSessionRecordingServer {
           entity(as[REQStartAGameWith]) { reqStartAGameWith =>
             complete {
               println(s"req: $reqStartAGameWith")
+              println("SPOC: " + sessionHandlingSPOC.path)
               (sessionHandlingSPOC ? reqStartAGameWith).mapTo[RecordingStatus]
 
             }
@@ -83,6 +84,7 @@ object GameSessionRecordingServer {
           entity(as[REQPlayAGameWith]) { reqPlayAGameWith =>
             complete {
               println(s"req: $reqPlayAGameWith")
+              println("SPOC: " + sessionHandlingSPOC.path)
               (sessionHandlingSPOC ? reqPlayAGameWith).mapTo[RecordingStatus]
             }
           }

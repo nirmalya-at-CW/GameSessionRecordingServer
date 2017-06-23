@@ -167,7 +167,7 @@ class GamePlayRecorderActorStateCorrectnessTest extends TestKit(ActorSystem("Hud
     gamePlayRecorderActor ! HuddleGame.EvQuestionAnswered(gameStartsAt + 4, questionaAndAnswers(3), gameSession)
 
     testProbe.expectMsgAllOf(
-         6 seconds, // Assuming the timeout duration for a game is 5 seconds!
+         25 seconds, // Assuming the timeout duration for a game is 20 seconds!
          Transition(gamePlayRecorderActor, GameYetToStartState,   GameHasStartedState),
          Transition(gamePlayRecorderActor, GameHasStartedState,   GameIsPausedState),
          Transition(gamePlayRecorderActor, GameIsPausedState,     GameIsContinuingState),

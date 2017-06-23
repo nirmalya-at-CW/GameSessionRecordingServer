@@ -25,7 +25,7 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean, val seededWithSession:
 
   val redisClient = new RedisClient("127.0.0.1", 6379)
 
-  val maxGameTimeout = Duration(12, TimeUnit.SECONDS)
+  val maxGameTimeout = Duration(20, TimeUnit.SECONDS)
   //config.useSingleServer().setAddress("127.0.0.1:6379")
 
    startWith(GameYetToStartState, DataToBeginWith)
@@ -180,7 +180,7 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean, val seededWithSession:
           storeSessionHistory(gameSession,GameStartedTupleInREDIS(atServerClockTime)) match {
 
             case f: FailedRedisSessionStatus => s"Failure: ${f.reason}"
-            case OKRedisSessionStatus        => s"Game session ($gameSession), start recorded"
+            case OKRedisSessionStatus        => s"sessionID($gameSession), Started."
           })
 
   }
@@ -195,7 +195,7 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean, val seededWithSession:
       storeSessionHistory(gameSession,GamePlayTupleInREDIS(atServerClockTime,questionNAnswer)) match {
 
         case f: FailedRedisSessionStatus => s"Failure: ${f.reason}, question(${questionNAnswer.questionID},${questionNAnswer.answerID}"
-        case OKRedisSessionStatus        => s"Game session ($gameSession), question(${questionNAnswer.questionID},${questionNAnswer.answerID} recorded"
+        case OKRedisSessionStatus        => s"sessionID($gameSession), Played(Q:${questionNAnswer.questionID},A:${questionNAnswer.answerID})."
       }
     )
   }
@@ -207,7 +207,7 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean, val seededWithSession:
       storeSessionHistory(gameSession,GamePausedTupleInREDIS(atServerClockTime)) match {
 
         case f: FailedRedisSessionStatus => s"Failure: ${f.reason}"
-        case OKRedisSessionStatus        => s"Game session ($gameSession), Pause($atServerClockTime) recorded"
+        case OKRedisSessionStatus        => s"sessionID($gameSession), Paused."
       }
     )
 
@@ -221,7 +221,7 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean, val seededWithSession:
       storeSessionHistory(gameSession,GameEndedTupleInREDIS(atServerClockTime, endedHow.toString)) match {
 
         case f: FailedRedisSessionStatus => s"Failure: ${f.reason}"
-        case OKRedisSessionStatus        => s"Game session ($gameSession), End($atServerClockTime) recorded"
+        case OKRedisSessionStatus        => s"sessionID($gameSession), Ended."
       }
     )
   }

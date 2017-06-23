@@ -40,3 +40,41 @@ session-related transient data.
 * If it is being run for the first time, sbt will download a number of dependent JARs. Ensure that you are connected to
  'Net and be patient. The whole process may take time.
 * If everything goes fine, then the HTTP Server will keep running on _localhost_ , at _port_ 9090.
+
+#   Example JSON messages for posting to GameSessionHandlingService
+
+Keys are important, values are just examples.
+
+##  Request to start a game (endpoint:  /start)
+    {
+        "company":"ABC",
+        "manager":"Vikas",
+        "playerID":"Nirmalya",
+        "gameName":"1Hudd",
+        "gameUUID":"A123"
+    }
+    
+##  Response to start a game
+    
+    {
+       "details":"SessionID: ABC.Vikas.playerID.1Hudd.A123, start recorded"
+    }
+    
+    It is perhaps obvious how the **SessionID** is formed. We are simply 'dot-separating' the fields that are supplied with
+    '/start' request. Ensuring uniqueness is the responsibility of the caller. Even if all the other fields are the same,
+    'gameUUID' is guaranteed to be unique. 
+
+##  Request to start a game (endpoint:  /play)
+    {
+       "sessionID":"ABC.Vikas.playerID.1Hudd.A123",
+       "questionID":1,
+       "answerID":2,
+       "isCorrect":true,
+       "score":200
+    }
+
+##  Response to play a game
+
+
+
+

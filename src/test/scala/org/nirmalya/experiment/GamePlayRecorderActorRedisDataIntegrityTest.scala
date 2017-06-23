@@ -7,7 +7,7 @@ import Matchers._
 import com.redis.RedisClient
 import org.json4s.native.Serialization.{read, write}
 
-import example.org.nirmalya.experiments.{Fire, GamePlayRecorderActor, GameSessionSPOCActor}
+import example.org.nirmalya.experiments.{GamePlayRecorderActor, GameSessionSPOCActor}
 import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.HuddleGame.{GameHasStartedState, GameIsContinuingState, GameIsPausedState, GameYetToStartState}
 import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol._
 import org.nirmalya.experiment.common.StopSystemAfterAll
@@ -57,7 +57,7 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
 
       gamePlayRecorderActor ! HuddleGame.EvStarted(gameStartsAt, gameSession)
 
-      expectMsg(RecordingStatus(s"Game session ($gameSession), start recorded"))
+      expectMsg(RecordingStatus(s"sessionID($gameSession), Started."))
 
       gamePlayRecorderActor ! HuddleGame.EvGamePlayRecordSoFarRequired(gameSession)
 
@@ -87,24 +87,24 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
       val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor(true, gameSession),actorName)
 
       gamePlayRecorderActor ! HuddleGame.EvStarted(gameStartsAt, gameSession)
-      expectMsg(RecordingStatus(s"Game session ($gameSession), start recorded"))
+      expectMsg(RecordingStatus(s"sessionID($gameSession), Started."))
 
       gamePlayRecorderActor ! HuddleGame.EvQuestionAnswered(gameStartsAt+1,questionaAndAnswers(0),gameSession)
       expectMsg(
         RecordingStatus(
-          s"Game session ($gameSession), question(${questionaAndAnswers(0).questionID},${questionaAndAnswers(0).answerID} recorded"))
+          s"sessionID($gameSession), Played(Q:${questionaAndAnswers(0).questionID},A:${questionaAndAnswers(0).answerID})."))
 
 
       gamePlayRecorderActor ! HuddleGame.EvPaused(gameStartsAt+2,gameSession)
       expectMsg(
         RecordingStatus(
-          s"Game session ($gameSession), Pause(${gameStartsAt+2}) recorded"))
+          s"sessionID($gameSession), Paused."))
 
 
       gamePlayRecorderActor ! HuddleGame.EvQuestionAnswered(gameStartsAt+3,questionaAndAnswers(1),gameSession)
       expectMsg(
         RecordingStatus(
-          s"Game session ($gameSession), question(${questionaAndAnswers(1).questionID},${questionaAndAnswers(1).answerID} recorded"))
+          s"sessionID($gameSession), Played(Q:${questionaAndAnswers(1).questionID},A:${questionaAndAnswers(1).answerID})."))
 
 
       gamePlayRecorderActor ! HuddleGame.EvEnded(gameStartsAt+4,GameEndedByPlayer, gameSession)
@@ -113,8 +113,7 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
 
         case m: RecordingStatus =>
 
-          println("m.details =" + m.details)
-          m.details should be (s"Game session ($gameSession), End(${gameStartsAt+4}) recorded")
+          m.details should be (s"sessionID($gameSession), Ended.")
       }
 
       val history = redisClient.hget(gameSession, "SessionHistory")
@@ -161,18 +160,18 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
       val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor(true, gameSession),actorName)
 
       gamePlayRecorderActor ! HuddleGame.EvStarted(gameStartsAt, gameSession)
-      expectMsg(RecordingStatus(s"Game session ($gameSession), start recorded"))
+      expectMsg(RecordingStatus(s"sessionID($gameSession), Started."))
 
       gamePlayRecorderActor ! HuddleGame.EvQuestionAnswered(gameStartsAt+1,questionaAndAnswers(0),gameSession)
       expectMsg(
         RecordingStatus(
-          s"Game session ($gameSession), question(${questionaAndAnswers(0).questionID},${questionaAndAnswers(0).answerID} recorded"))
+          s"sessionID($gameSession), Played(Q:${questionaAndAnswers(0).questionID},A:${questionaAndAnswers(0).answerID})."))
 
 
       gamePlayRecorderActor ! HuddleGame.EvPaused(gameStartsAt+2,gameSession)
       expectMsg(
         RecordingStatus(
-          s"Game session ($gameSession), Pause(${gameStartsAt+2}) recorded"))
+          s"sessionID($gameSession), Paused."))
 
       // Successive Pause, will be ignored by the GameSession's FSM
       gamePlayRecorderActor ! HuddleGame.EvPaused(gameStartsAt+3,gameSession)
@@ -183,7 +182,7 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
       expectMsgPF(2 second) {
 
         case m: RecordingStatus =>
-          m.details should be (s"Game session ($gameSession), End(${gameStartsAt+4}) recorded")
+          m.details should be (s"sessionID($gameSession), Ended.")
       }
 
       val history = redisClient.hget(gameSession, "SessionHistory")
@@ -227,21 +226,22 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
       val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor(true, gameSession),actorName)
 
       gamePlayRecorderActor ! HuddleGame.EvStarted(gameStartsAt, gameSession)
-      expectMsg(RecordingStatus(s"Game session ($gameSession), start recorded"))
+      expectMsg(RecordingStatus(s"sessionID($gameSession), Started."))
 
       gamePlayRecorderActor ! HuddleGame.EvQuestionAnswered(gameStartsAt+1,questionaAndAnswers(0),gameSession)
       expectMsg(
         RecordingStatus(
-          s"Game session ($gameSession), question(${questionaAndAnswers(0).questionID},${questionaAndAnswers(0).answerID} recorded"))
+          s"sessionID($gameSession), Played(Q:${questionaAndAnswers(0).questionID},A:${questionaAndAnswers(0).answerID})."))
 
 
       gamePlayRecorderActor ! HuddleGame.EvPaused(gameStartsAt+2,gameSession)
       expectMsg(
         RecordingStatus(
-          s"Game session ($gameSession), Pause(${gameStartsAt+2}) recorded"))
+          s"sessionID($gameSession), Paused."))
 
       awaitCond(
         {
+          // 'SessionHistory' below, is hardcoded as the 'V', in (K,V) as stored in REDIS hash.
           val history = redisClient.hget(gameSession, "SessionHistory")
 
           history match {
