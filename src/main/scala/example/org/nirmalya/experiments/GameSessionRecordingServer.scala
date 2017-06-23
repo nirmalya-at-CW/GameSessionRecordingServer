@@ -11,7 +11,7 @@ import akka.stream.{ActorMaterializer, Materializer}
 import org.json4s.{DefaultFormats, Formats, ShortTypeHints, native}
 import org.json4s.native.Serialization
 import de.heikoseeberger.akkahttpjson4s.Json4sSupport
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.ExternalAPIParams.{REQPauseAGameWith, REQPlayAGameWith, REQStartAGameWith}
+import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.ExternalAPIParams.{REQEndAGameWith, REQPauseAGameWith, REQPlayAGameWith, REQStartAGameWith}
 import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.RecordingStatus
 
 import scala.concurrent.Future
@@ -124,10 +124,10 @@ object GameSessionRecordingServer {
     post {
       logRequest("StartRequest") {
         pathPrefix("end") {
-          entity(as[REQPauseAGameWith]) { reqPauseAGameWith =>
+          entity(as[REQEndAGameWith]) { reqEndAGameWith =>
             complete {
-              println(s"req: $reqPauseAGameWith")
-              (sessionHandlingSPOC ? reqPauseAGameWith).mapTo[RecordingStatus]
+              println(s"req: $reqEndAGameWith")
+              (sessionHandlingSPOC ? reqEndAGameWith).mapTo[RecordingStatus]
             }
           }
         }

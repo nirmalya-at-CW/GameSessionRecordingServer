@@ -57,7 +57,7 @@ Keys are important, values are just examples.
 ##  Response to start a game
     
     {
-       "details":"SessionID: ABC.Vikas.playerID.1Hudd.A123, start recorded"
+       "details":"sessionID(ABC.Vikas.playerID.1Hudd.A123), Started."
     }
     
     It is perhaps obvious how the **SessionID** is formed. We are simply 'dot-separating' the fields that are supplied with
@@ -75,6 +75,32 @@ Keys are important, values are just examples.
 
 ##  Response to play a game
 
+    {
+       details":"sessionID(ABC.Vikas.playerID.1Hudd.A123), Played Q(1)-A(2)."
+    }
+    
+##  Request to pause a game (endpoint: /pause)
+    
+    {
+           "sessionID":"ABC.Vikas.playerID.1Hudd.A123"
+    }
+    
+##  Response to pause a game
 
+    {
+        "details":"sessionID(ABC.Vikas.playerID.1Hudd.A123), Paused."
+    }
+    
+##  Request to end a game (endpoint: /end)
+     
+    {
+        "sessionID":"ABC.Vikas.playerID.1Hudd.A123"
+    }
+    
+## Response to end a game
+    
+    {
+        "details":"sessionID(ABC.Vikas.playerID.1Hudd.A123), Ended."
+    }
 
 
