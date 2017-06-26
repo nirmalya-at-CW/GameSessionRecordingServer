@@ -39,8 +39,9 @@ session-related transient data.
 * Fire: _sbt compile test run_
 * If it is being run for the first time, sbt will download a number of dependent JARs. Ensure that you are connected to
  'Net and be patient. The whole process may take time.
-* If everything goes fine, then the HTTP Server will keep running on _localhost_ , at _port_ 9090.
-* At this point, REDIS instance is assumed to be running at the default port (6379). This value is hardcoded.
+* src/main/resources/application.conf contains all the application specific parameters. Amongst other things, it contains
+  server endpoints (host,port) and REDIS endpoints (host,port).
+* If REDIS cannot be reached, the server emits an explanatory message and refuses to start.  
 * At this point, timeout for a game session occurs after 20 seconds. This is hardcoded.
 
 #   Example JSON messages for posting to GameSessionHandlingService
