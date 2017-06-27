@@ -9,7 +9,7 @@ import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshal
 import akka.http.scaladsl.server.Route
 import akka.stream.{ActorMaterializer, Materializer}
 import org.json4s.{DefaultFormats, Formats, ShortTypeHints, native}
-import org.json4s.native.Serialization
+
 import de.heikoseeberger.akkahttpjson4s.Json4sSupport
 import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.ExternalAPIParams.{REQEndAGameWith, REQPauseAGameWith, REQPlayAGameWith, REQStartAGameWith}
 import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.RecordingStatus
@@ -17,34 +17,83 @@ import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.Recor
 import scala.concurrent.Future
 import akka.pattern._
 import akka.util.Timeout
+import com.redis.RedisClient
+import com.typesafe.config.ConfigFactory
 
 import scala.concurrent.duration.Duration
+import scala.util.{Failure, Success, Try}
 
 /**
   * Created by nirmalya on 19/6/17.
   */
 object GameSessionRecordingServer {
 
-  implicit val system = ActorSystem()
+  implicit val underlyingActorSystem = ActorSystem("GameSessionRecording")
   implicit val materializer = ActorMaterializer()
-  implicit val executionContext = system.dispatcher
+  implicit val executionContext = underlyingActorSystem.dispatcher
   implicit val askTimeOutDuration:Timeout = Duration(3, "seconds")
 
-  val sessionHandlingSPOC = system.actorOf(GameSessionSPOCActor.props, "SPOC")
+  val sessionHandlingSPOC = underlyingActorSystem.actorOf(GameSessionSPOCActor.props, "GameSessionSPOC")
 
   def main(args: Array[String]) {
 
-    val special = Logging(system, "SpecialRoutes")
+    val special = Logging(underlyingActorSystem, "SpecialRoutes")
 
     val route: Route = startRoute ~ playRoute ~ pauseRoute ~ endRoute
 
-    val (host, port) = ("localhost", 9090)
+    val config = ConfigFactory.load()
+
+    val (serviceHost, servicePort) = (
+
+        config.getConfig("GameSessionService.availableAt").getString("host"),
+        config.getConfig("GameSessionService.availableAt").getInt("port")
+
+    )
+
+    val (redisHost, redisPort) = (
+
+      config.getConfig("GameSessionService.redisEndpoint").getString("host"),
+      config.getConfig("GameSessionService.redisEndpoint").getInt("port")
+    )
+
+    if (!isRedisReachable(redisHost,redisPort)) {
+
+      println(s"Cannot reach a redis node at $redisHost:$redisPort")
+      println("GamesSessionRecordingServer cannot start! Connectivity to a REDIS instance is mandatory.")
+
+      System.exit(-1)
+    }
+
     val bindingFuture: Future[ServerBinding] =
-      Http().bindAndHandle(route, host, port)
+      Http().bindAndHandle(route, serviceHost, servicePort)
 
     bindingFuture.failed.foreach { ex =>
-      println(ex, "Failed to bind to {}:{}!", host, port)
+      println(ex, "Failed to bind to {}:{}!", serviceHost, servicePort)
     }
+  }
+
+  private def isRedisReachable(redisHost: String,redisPort: Int): Boolean = {
+
+    val redisClient =
+      Try {
+        new RedisClient(redisHost, redisPort)
+      } match {
+
+        case Success(e)   => Some(e)
+        case Failure(ex)  =>
+          println(s"Exception while connecting to redis, ${ex.getMessage}")
+          None
+      }
+
+    if (redisClient.isEmpty)
+         false
+    else {
+         val redisResponse= redisClient.get.ping.getOrElse("NoPONG")
+         redisClient.get.disconnect
+         // REDIS is expected to respond with a PONG when 'pinged'.
+         if (redisResponse == "NoPong") false else true
+    }
+
   }
 
   def startRoute(implicit mat: Materializer) = {
