@@ -1,12 +1,13 @@
 package org.nirmalya.experiment
 
+import java.util.concurrent.TimeUnit
+
 import akka.actor.{ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit}
 import org.scalatest._
 import Matchers._
 import com.redis.RedisClient
 import org.json4s.native.Serialization.{read, write}
-
 import example.org.nirmalya.experiments.{GamePlayRecorderActor, GameSessionSPOCActor}
 import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.HuddleGame.{GameHasStartedState, GameIsContinuingState, GameIsPausedState, GameYetToStartState}
 import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol._
@@ -15,6 +16,7 @@ import org.scalatest.{BeforeAndAfterAll, MustMatchers, WordSpecLike}
 
 import scala.concurrent.duration._
 import akka.testkit._
+import com.typesafe.config.ConfigFactory
 
 import scala.language.postfixOps
 
@@ -29,7 +31,25 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
   with ImplicitSender
   with StopSystemAfterAll {
 
-  val redisClient = new RedisClient("127.0.0.1", 6379)
+  val config = ConfigFactory.load()
+
+  val (redisHost, redisPort) = (
+
+    config.getConfig("GameSession.redisEndPoint").getString("host"),
+    config.getConfig("GameSession.redisEndPoint").getInt("port")
+  )
+
+  val maxGameTimeOut = Duration(
+    config.getConfig("GameSession.maxGameTimeOut").getInt("duration"),
+    TimeUnit.SECONDS
+  )
+
+  val redisUpdateIndicatorAwaitingTime = Duration(
+    config.getConfig("GameSession.maxGameTimeOut").getInt("duration") + 10,
+    TimeUnit.SECONDS
+  )
+
+  val redisClient = new RedisClient(redisHost, redisPort)
 
   val keyPrefix = "HuddleGame-Test-RedisData-"
 
@@ -53,7 +73,14 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
 
       val gameSession = GameSession(keyPrefix + actorName, "Player-01")
 
-      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor(true, gameSession),actorName)
+      val gamePlayRecorderActor = system.actorOf(
+        GamePlayRecorderActor(
+          true,
+          gameSession,
+          redisHost,
+          redisPort,
+          maxGameTimeOut
+        ),actorName)
 
       gamePlayRecorderActor ! HuddleGame.EvStarted(gameStartsAt, gameSession)
 
@@ -84,7 +111,14 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
 
       val gameSession = GameSession(keyPrefix + actorName, "Player-01")
 
-      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor(true, gameSession),actorName)
+      val gamePlayRecorderActor = system.actorOf(
+        GamePlayRecorderActor(
+            true,
+            gameSession,
+            redisHost,
+            redisPort,
+            maxGameTimeOut
+          ),actorName)
 
       gamePlayRecorderActor ! HuddleGame.EvStarted(gameStartsAt, gameSession)
       expectMsg(RecordingStatus(s"sessionID($gameSession), Started."))
@@ -157,7 +191,17 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
 
       val gameSession = GameSession(keyPrefix + "-" + actorName, "Player-01")
 
-      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor(true, gameSession),actorName)
+      val gamePlayRecorderActor = system.actorOf(
+        GamePlayRecorderActor(
+              true,
+              gameSession,
+              redisHost,
+              redisPort,
+              maxGameTimeOut
+        ),actorName
+      )
+
+
 
       gamePlayRecorderActor ! HuddleGame.EvStarted(gameStartsAt, gameSession)
       expectMsg(RecordingStatus(s"sessionID($gameSession), Started."))
@@ -223,7 +267,15 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
 
       val gameSession = GameSession(keyPrefix + "-" + actorName, "Player-01")
 
-      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor(true, gameSession),actorName)
+      val gamePlayRecorderActor = system.actorOf(
+        GamePlayRecorderActor(
+          true,
+          gameSession,
+          redisHost,
+          redisPort,
+          maxGameTimeOut
+        ),actorName
+      )
 
       gamePlayRecorderActor ! HuddleGame.EvStarted(gameStartsAt, gameSession)
       expectMsg(RecordingStatus(s"sessionID($gameSession), Started."))
@@ -251,7 +303,7 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
             case None =>
               false
           }
-        }, 20 seconds, 5 seconds, "REDIS"
+        }, redisUpdateIndicatorAwaitingTime, 5 seconds, "REDIS"
       )
 
       val history = redisClient.hget(gameSession, "SessionHistory")

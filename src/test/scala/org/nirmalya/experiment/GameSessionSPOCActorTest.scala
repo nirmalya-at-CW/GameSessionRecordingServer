@@ -58,7 +58,7 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
 
       spocActor ! req
 
-      expectMsg(RecordingStatus(s"Game session (${req.toString}), start recorded"))
+      expectMsg(RecordingStatus(s"sessionID(${req.toString}), Started."))
     }
 
     "confirms that a GamePlayRecorder Actor that has already started, has paused correctly" in {
@@ -69,7 +69,7 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
 
       spocActor ! reqStart
 
-      expectMsg(RecordingStatus(s"Game session (${reqStart.toString}), start recorded"))
+      expectMsg(RecordingStatus(s"sessionID(${reqStart.toString}), Started."))
 
       val reqPause = REQPauseAGameWith(reqStart.toString)
 
@@ -91,7 +91,7 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
 
       spocActor ! reqStart
 
-      expectMsg(RecordingStatus(s"Game session (${reqStart.toString}), start recorded"))
+      expectMsg(RecordingStatus(s"sessionID(${reqStart.toString}), Started."))
 
       val reqPause = REQPauseAGameWith(reqStart.toString)
 

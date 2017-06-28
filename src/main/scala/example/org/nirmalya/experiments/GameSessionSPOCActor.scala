@@ -1,11 +1,13 @@
 package example.org.nirmalya.experiments
 
+import java.util.concurrent.TimeUnit
+
 import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
 import akka.pattern._
 import akka.util.Timeout
 import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.{ExternalAPIParams, GameEndedByPlayer, GameSession, HuddleGame, QuestionAnswerTuple, RecordingStatus}
 
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.util.{Failure, Success}
 
 
@@ -19,6 +21,11 @@ class GameSessionSPOCActor extends Actor with ActorLogging {
 
   implicit val executionContext = context.dispatcher
   implicit val askTimeOutDuration:Timeout = Duration(3, "seconds")
+  val redisHost = context.system.settings.config.getConfig("GameSession.redisEndPoint").getString("host")
+  val redisPort = context.system.settings.config.getConfig("GameSession.redisEndPoint").getInt("port")
+  val maxGameTimeOut = FiniteDuration(
+    context.system.settings.config.getConfig("GameSession.maxGameTimeOut").getInt("duration"),
+    TimeUnit.SECONDS)
 
   var activeGameSessionActors: Map[String, ActorRef] = Map.empty
 
@@ -31,7 +38,14 @@ class GameSessionSPOCActor extends Actor with ActorLogging {
         sender ! RecordingStatus(s"GameSession with $r is already active.")
       else {
         val originalSender = sender()
-        val child = context.actorOf(GamePlayRecorderActor(true, gameSession), gameSession.toString)
+        val child = context.actorOf(
+          GamePlayRecorderActor(
+            true,
+            gameSession,
+            redisHost,
+            redisPort,
+            maxGameTimeOut
+          ), gameSession.toString)
         context.watch(child)
 
         this.activeGameSessionActors = this.activeGameSessionActors + Tuple2(r.toString,child)
@@ -66,7 +80,7 @@ class GameSessionSPOCActor extends Actor with ActorLogging {
             case Failure(e) =>   originalSender ! RecordingStatus(e.getMessage)
           }
         case None                =>
-          originalSender ! RecordingStatus(s"No **session** with ${r.sessionID} exists.")
+          originalSender ! RecordingStatus(s"No session with ${r.sessionID} exists.")
       }
 
     case r: ExternalAPIParams.REQPauseAGameWith =>

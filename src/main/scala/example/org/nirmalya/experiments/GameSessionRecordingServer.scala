@@ -45,15 +45,15 @@ object GameSessionRecordingServer {
 
     val (serviceHost, servicePort) = (
 
-        config.getConfig("GameSessionService.availableAt").getString("host"),
-        config.getConfig("GameSessionService.availableAt").getInt("port")
+        config.getConfig("GameSession.availableAt").getString("host"),
+        config.getConfig("GameSession.availableAt").getInt("port")
 
     )
 
     val (redisHost, redisPort) = (
 
-      config.getConfig("GameSessionService.redisEndpoint").getString("host"),
-      config.getConfig("GameSessionService.redisEndpoint").getInt("port")
+      config.getConfig("GameSession.redisEndPoint").getString("host"),
+      config.getConfig("GameSession.redisEndPoint").getInt("port")
     )
 
     if (!isRedisReachable(redisHost,redisPort)) {

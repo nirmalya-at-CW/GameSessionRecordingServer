@@ -11,26 +11,29 @@ import org.json4s._
 import org.json4s.native.JsonMethods._
 import org.json4s.native.Serialization.{read, write}
 
-import scala.concurrent.duration.{Duration, TimeUnit}
+import scala.concurrent.duration.{Duration, FiniteDuration, TimeUnit}
 
 
 /**
   * Created by nirmalya on 5/6/17.
   */
-class GamePlayRecorderActor(val cleanDataOnExit: Boolean, val seededWithSession: GameSession) extends FSM [HuddleGameState, HuddleGameFSMData] with ActorLogging {
+class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
+                            val seededWithSession: GameSession,
+                            val redisHost: String,
+                            val redisPort: Int,
+                            val maxGameTimeOut: FiniteDuration
+                           ) extends FSM [HuddleGameState, HuddleGameFSMData] with ActorLogging {
 
   //TODO
   // 1) Pick Redis configurationn values from Akka Config, instead of hardcoding
   // 2) Pick Timeout value from Akka config, instead of hardcoding
 
-  val redisClient = new RedisClient("127.0.0.1", 6379)
 
-  val maxGameTimeout = Duration(20, TimeUnit.SECONDS)
-  //config.useSingleServer().setAddress("127.0.0.1:6379")
+  val redisClient = new RedisClient(redisHost, redisPort)
 
    startWith(GameYetToStartState, DataToBeginWith)
 
-   when (HuddleGame.GameYetToStartState, maxGameTimeout) {
+   when (HuddleGame.GameYetToStartState, this.maxGameTimeOut) {
 
      case Event(gameStarted: HuddleGame.EvStarted, _) =>
 
@@ -39,7 +42,7 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean, val seededWithSession:
 
    }
 
-   when (HuddleGame.GameHasStartedState, maxGameTimeout) {
+   when (HuddleGame.GameHasStartedState, this.maxGameTimeOut) {
 
      case Event(questionAnswered: HuddleGame.EvQuestionAnswered, _) =>
 
@@ -67,7 +70,7 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean, val seededWithSession:
 
    }
 
-   when (HuddleGame.GameIsContinuingState, maxGameTimeout)  {
+   when (HuddleGame.GameIsContinuingState, this.maxGameTimeOut)  {
 
      case Event(questionAnswered: HuddleGame.EvQuestionAnswered, _) =>
        sender ! recordThatAQuestionIsAnswered(
@@ -95,7 +98,7 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean, val seededWithSession:
 
    }
 
-  when (HuddleGame.GameIsPausedState, maxGameTimeout)  {
+  when (HuddleGame.GameIsPausedState, this.maxGameTimeOut)  {
 
     case Event(questionAnswered: HuddleGame.EvQuestionAnswered, _) =>
       sender ! recordThatAQuestionIsAnswered(
@@ -287,5 +290,11 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean, val seededWithSession:
 }
 
 object GamePlayRecorderActor {
-  def apply(shouldCleanUpREDIS: Boolean, sessionID: GameSession): Props = Props(new GamePlayRecorderActor(shouldCleanUpREDIS, sessionID))
+  def apply(shouldCleanUpREDIS: Boolean,
+            sessionID: GameSession,
+            redisHost: String,
+            redisPort: Int,
+            maxGameTimeOut: FiniteDuration
+           ): Props =
+    Props(new GamePlayRecorderActor(shouldCleanUpREDIS, sessionID, redisHost, redisPort, maxGameTimeOut))
 }
