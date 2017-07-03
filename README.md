@@ -1,9 +1,9 @@
 
-# Description
+## Description
 In 1Huddle, we are reimplementing the functionality of recording Game Sessions. At this point in time,
 it is PoC and is **very much an WIP**.
 
-# The objective is to run this as an _independent_ Service. It:
+## The objective is to run this as an _independent_ Service. It:
 
  *   Is accessible using REST-style APIs.
  *   Only manages the Game Session, not any of the downstream functionality
@@ -13,7 +13,7 @@ it is PoC and is **very much an WIP**.
  *   Expects another Service to be available, which consumes the GameSession information
      after it is *Complete* (refer to https://codewalla.atlassian.net/wiki/display/1NFL/Game+Session%2C+its+nature+and+our+approach+-+Part+1)
 
-# Implementation outline
+## Implementation outline
 
 This service (named GameSessionRecordingServer) is implemented using Akka-HTTP and Akka-FSM. The language
 used is Scala (which is almost always easily interoperable with Java). The software is bundled and deployed as 
@@ -38,7 +38,7 @@ earlier. THe HTTP operation used is **PUT**.
 A instance of REDIS in-memory database is assumed to be available. Recorder Actors use this for storing all
 session-related transient data.
 
-# How to build and run
+## How to build and run
 * Presence of Java (JDK 1.8+) is a pre-requisite.
 * Ensure that JAVA_HOME environment variable is set up properly.
 * Ensure that $JAVA_HOME/bin and $JAVA_HOME/lib are added to PATH environment variable.
@@ -52,17 +52,19 @@ session-related transient data.
 * If REDIS cannot be reached, the server emits an explanatory message and refuses to start.  
 * At this point, timeout for a game session occurs after 20 seconds. This is hardcoded.
 
-#   Major TODOs
-*   One connection per GamePlayRecorderActor may soon hit a wall, 
+##   Major TODOs
+*   One connection per _GamePlayRecorderActor_ may soon hit a wall, 
 because each such Actor may remain alive for a long duration. We have
 to look for an alternative of 'pooled connections'.
-*   We have to implement a mirror actor for every GamePlayRecorderActor
+*   We have to implement a mirror actor for every _GamePlayRecorderActor_
 to provide availability. How will these two communicate?
-*   GameSessionSPOCActor should periodically check if REDIS is accessible.
+*   _GameSessionSPOCActor_ should periodically check if REDIS is accessible.
 If it is not, then a warning message must be logged and a message must
-be sent to the Admin Actor (TBD). 
+be sent to the Admin Actor (TBD).
+*   _GameSessionCompletionEmitterActor_ must call the HTTP Endpoints using
+JSON. At the moment, it is passing Text.
 
-#   Example JSON messages for posting to GameSessionHandlingService
+##   Example JSON messages for posting to GameSessionHandlingService
 
 Keys are important, values are just examples.
 
