@@ -36,7 +36,7 @@ class GameSessionCompletionEmitterActorTest
         val gameSessionCompletionEmitter =
           system
             .actorOf(
-              GameSessionCompletionEmitterActor(gameSessionCompletionSubscriberEndpoints),"EmitterOnFinishingGameSession")
+              GameSessionCompletionEmitterActor(gameSessionCompletionSubscriberEndpoints),"EmitterOnFinishingGameSession-1")
 
 
         EventFilter.info(pattern = "Emitted", occurrences = 1) intercept {
@@ -51,7 +51,7 @@ class GameSessionCompletionEmitterActorTest
       val gameSessionCompletionEmitter =
         system
           .actorOf(
-            GameSessionCompletionEmitterActor(gameSessionCompletionSubscriberEndpoints),"EmitterOnFinishingGameSession")
+            GameSessionCompletionEmitterActor(gameSessionCompletionSubscriberEndpoints),"EmitterOnFinishingGameSession-2")
 
 
       EventFilter.info(pattern = "Failed:", occurrences = 1) intercept {
