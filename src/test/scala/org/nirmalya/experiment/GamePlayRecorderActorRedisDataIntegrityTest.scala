@@ -71,6 +71,8 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
 
       val actorName =  "RecorderActorForTest-1"
 
+      val probe1 = TestProbe()
+
       val gameSession = GameSession(keyPrefix + actorName, "Player-01")
 
       val gamePlayRecorderActor = system.actorOf(
@@ -79,7 +81,8 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
           gameSession,
           redisHost,
           redisPort,
-          maxGameTimeOut
+          maxGameTimeOut,
+          probe1.ref
         ),actorName)
 
       gamePlayRecorderActor ! HuddleGame.EvStarted(gameStartsAt, gameSession)
@@ -109,6 +112,8 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
 
       val actorName =  "RecorderActorForTest-3"
 
+      val probe1 = TestProbe()
+
       val gameSession = GameSession(keyPrefix + actorName, "Player-01")
 
       val gamePlayRecorderActor = system.actorOf(
@@ -117,7 +122,8 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
             gameSession,
             redisHost,
             redisPort,
-            maxGameTimeOut
+            maxGameTimeOut,
+            probe1.ref
           ),actorName)
 
       gamePlayRecorderActor ! HuddleGame.EvStarted(gameStartsAt, gameSession)
@@ -189,6 +195,8 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
 
       val actorName =  "RecorderActorForTest-4"
 
+      val probe1 = TestProbe()
+
       val gameSession = GameSession(keyPrefix + "-" + actorName, "Player-01")
 
       val gamePlayRecorderActor = system.actorOf(
@@ -197,7 +205,8 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
               gameSession,
               redisHost,
               redisPort,
-              maxGameTimeOut
+              maxGameTimeOut,
+              probe1.ref
         ),actorName
       )
 
@@ -265,6 +274,8 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
 
       val actorName =  "RecorderActorForTest-5"
 
+      val probe1 = TestProbe()
+
       val gameSession = GameSession(keyPrefix + "-" + actorName, "Player-01")
 
       val gamePlayRecorderActor = system.actorOf(
@@ -273,7 +284,8 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
           gameSession,
           redisHost,
           redisPort,
-          maxGameTimeOut
+          maxGameTimeOut,
+          probe1.ref
         ),actorName
       )
 

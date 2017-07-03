@@ -96,6 +96,8 @@ object GameSessionHandlingServiceProtocol {
 
   case class RecordingStatus(details: String)
 
+  case class EmitWhenGameSessionIsFinished(contents: String)
+
 
   trait RedisSessionStatus
   case class  FailedRedisSessionStatus(reason: String) extends RedisSessionStatus

@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestKit}
 import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.ExternalAPIParams.{REQPauseAGameWith, REQPlayAGameWith, REQStartAGameWith}
 import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.{GameSession, QuestionAnswerTuple, RecordingStatus}
-import example.org.nirmalya.experiments.GameSessionSPOCActor
+import example.org.nirmalya.experiments.{GameSessionCompletionEmitterActor, GameSessionSPOCActor}
 import org.nirmalya.experiment.common.StopSystemAfterAll
 import org.scalatest.time.Seconds
 import org.scalatest.{BeforeAndAfterAll, MustMatchers, WordSpecLike}
@@ -32,13 +32,17 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
     QuestionAnswerTuple(4,4,true,10)
   )
 
+  val emitterActor = system.actorOf(GameSessionCompletionEmitterActor(List("http://httpbin.org/put")))
+
   override def beforeAll = super.beforeAll
 
   "A Huddle GamePlay SPOC Actor" must {
 
     "indicate that a GamePlayRecorder Actor doesn't exist for a wrong session id" in {
 
-      val spocActor = system.actorOf(GameSessionSPOCActor.props)
+
+
+      val spocActor = system.actorOf(GameSessionSPOCActor(emitterActor))
       spocActor ! REQPlayAGameWith(
                       inCorrectGameSession.toString,
                       questionaAndAnswers(0).questionID.toString,
@@ -52,7 +56,7 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
 
     "confirms that a GamePlayRecorder Actor has started" in {
 
-      val spocActor = system.actorOf(GameSessionSPOCActor.props)
+      val spocActor = system.actorOf(GameSessionSPOCActor(emitterActor))
 
       val req = REQStartAGameWith("Codewalla","Boss","minion","tic-tac-toe","A123")
 
@@ -63,7 +67,7 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
 
     "confirms that a GamePlayRecorder Actor that has already started, has paused correctly" in {
 
-      val spocActor = system.actorOf(GameSessionSPOCActor.props)
+      val spocActor = system.actorOf(GameSessionSPOCActor(emitterActor))
 
       val reqStart = REQStartAGameWith("Codewalla","Boss","minion","tic-tac-toe","A1234")
 
@@ -85,7 +89,7 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
 
     "confirms that a GamePlayRecorder Actor, already started, is stopped automatically after inaction of certain time" in {
 
-      val spocActor = system.actorOf(GameSessionSPOCActor.props)
+      val spocActor = system.actorOf(GameSessionSPOCActor(emitterActor))
 
       val reqStart = REQStartAGameWith("Codewalla","Boss","minion","tic-tac-toe","A12345")
 

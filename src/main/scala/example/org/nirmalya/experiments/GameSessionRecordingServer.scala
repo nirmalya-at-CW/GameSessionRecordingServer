@@ -10,10 +10,6 @@ import akka.http.scaladsl.server.Route
 import akka.stream.{ActorMaterializer, Materializer}
 import org.json4s.{DefaultFormats, Formats, ShortTypeHints, native}
 
-import de.heikoseeberger.akkahttpjson4s.Json4sSupport
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.ExternalAPIParams.{REQEndAGameWith, REQPauseAGameWith, REQPlayAGameWith, REQStartAGameWith}
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.RecordingStatus
-
 import scala.concurrent.Future
 import akka.pattern._
 import akka.util.Timeout
@@ -21,7 +17,14 @@ import com.redis.RedisClient
 import com.typesafe.config.ConfigFactory
 
 import scala.concurrent.duration.Duration
+import collection.JavaConversions._
 import scala.util.{Failure, Success, Try}
+
+import de.heikoseeberger.akkahttpjson4s.Json4sSupport
+import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.ExternalAPIParams.{REQEndAGameWith, REQPauseAGameWith, REQPlayAGameWith, REQStartAGameWith}
+import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.RecordingStatus
+
+
 
 /**
   * Created by nirmalya on 19/6/17.
@@ -33,7 +36,19 @@ object GameSessionRecordingServer {
   implicit val executionContext = underlyingActorSystem.dispatcher
   implicit val askTimeOutDuration:Timeout = Duration(3, "seconds")
 
-  val sessionHandlingSPOC = underlyingActorSystem.actorOf(GameSessionSPOCActor.props, "GameSessionSPOC")
+  val config = ConfigFactory.load()
+
+  val gameSessionCompletionSubscriberEndpoints =
+    config.getConfig("GameSession.externalServices").getStringList("completionSubscribers").toList
+
+  val gameSessionCompletionEmitter =
+    underlyingActorSystem
+    .actorOf(
+      GameSessionCompletionEmitterActor(gameSessionCompletionSubscriberEndpoints),"EmitterOnFinishingGameSession")
+
+  val sessionHandlingSPOC =
+    underlyingActorSystem
+    .actorOf(GameSessionSPOCActor(gameSessionCompletionEmitter), "GameSessionSPOC")
 
   def main(args: Array[String]) {
 
@@ -41,7 +56,7 @@ object GameSessionRecordingServer {
 
     val route: Route = startRoute ~ playRoute ~ pauseRoute ~ endRoute
 
-    val config = ConfigFactory.load()
+
 
     val (serviceHost, servicePort) = (
 

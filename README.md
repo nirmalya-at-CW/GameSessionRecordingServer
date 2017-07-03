@@ -24,8 +24,16 @@ backend, the game being played in the real-world. This Actor implements a very s
 responds to a handful events, viz., EvStarted, EvPaused etc. It also sets up a timer for each Game Session, which is
 fired to indicate a timeout on the part of the Player. 
 
-Another Actor, named *GameSessionSPOCActor* assumes the role of a gate-keeper. It keeps track of all the *GamePlayRecorderActors*
-currently alive and forwards requests (API) made from the external world, to the intended recorders.
+Another Actor, named *GameSessionSPOCActor* assumes the role of a gate-keeper. It 
+keeps track of all the *GamePlayRecorderActors* currently alive and forwards requests (API) 
+made from the external world, to the intended recorders.
+
+*GameSessionSPOCActor* is initialized (during construction) with a specialized actor, named
+_GameSessionCompletionEmitterActor_. Its job is to call specific (predefined) HTTP endpoints, with the entire
+record of a finished GameSession. A good example of such endpoints is that of a **Leaderboard Calculation Service**.
+Whenever a Game Session is finished, the _GamePlayRecorderActor_ - which is responsible for that session - passes
+the final record to _GameSessionCompletionEmitterActor_. The latter, then contacts the HTTP endpoints mentioned 
+earlier. THe HTTP operation used is **PUT**. 
 
 A instance of REDIS in-memory database is assumed to be available. Recorder Actors use this for storing all
 session-related transient data.
@@ -43,6 +51,16 @@ session-related transient data.
   server endpoints (host,port) and REDIS endpoints (host,port).
 * If REDIS cannot be reached, the server emits an explanatory message and refuses to start.  
 * At this point, timeout for a game session occurs after 20 seconds. This is hardcoded.
+
+#   Major TODOs
+*   One connection per GamePlayRecorderActor may soon hit a wall, 
+because each such Actor may remain alive for a long duration. We have
+to look for an alternative of 'pooled connections'.
+*   We have to implement a mirror actor for every GamePlayRecorderActor
+to provide availability. How will these two communicate?
+*   GameSessionSPOCActor should periodically check if REDIS is accessible.
+If it is not, then a warning message must be logged and a message must
+be sent to the Admin Actor (TBD). 
 
 #   Example JSON messages for posting to GameSessionHandlingService
 

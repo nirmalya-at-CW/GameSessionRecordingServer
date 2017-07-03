@@ -3,7 +3,7 @@ package example.org.nirmalya.experiments
 
 import java.util.concurrent.TimeUnit
 
-import akka.actor.{ActorLogging, FSM, Props}
+import akka.actor.{ActorLogging, ActorRef, FSM, Props}
 import com.redis.RedisClient
 import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.HuddleGame._
 import GameSessionHandlingServiceProtocol.{HuddleGame, NonExistingCompleteGamePlaySessionHistory, RecordingStatus, _}
@@ -21,7 +21,8 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
                             val seededWithSession: GameSession,
                             val redisHost: String,
                             val redisPort: Int,
-                            val maxGameTimeOut: FiniteDuration
+                            val maxGameTimeOut: FiniteDuration,
+                            val sessionCompletionEvReceiverActor: ActorRef
                            ) extends FSM [HuddleGameState, HuddleGameFSMData] with ActorLogging {
 
   //TODO
@@ -126,7 +127,11 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
 
     case Event(cleanUp: HuddleGame.EvCleanUpRequired, _) =>
 
-      //TODO: Call REST endpoint to store the GameSession
+      //Call REST endpoint to store the GameSession
+
+      val currentRecord = this.extractCurrentGamePlayRecord(cleanUp.gameSession)
+      this.sessionCompletionEvReceiverActor ! currentRecord.details
+
       //TODO: Replace the if-check below, with a HOF
        if (!this.cleanDataOnExit) removeGameSessionFromREDIS(cleanUp.gameSession)
        stop(FSM.Normal, DataToCleanUpRedis(cleanUp.gameSession))
@@ -294,7 +299,8 @@ object GamePlayRecorderActor {
             sessionID: GameSession,
             redisHost: String,
             redisPort: Int,
-            maxGameTimeOut: FiniteDuration
+            maxGameTimeOut: FiniteDuration,
+            sessionCompletionEvReceiver: ActorRef
            ): Props =
-    Props(new GamePlayRecorderActor(shouldCleanUpREDIS, sessionID, redisHost, redisPort, maxGameTimeOut))
+    Props(new GamePlayRecorderActor(shouldCleanUpREDIS, sessionID, redisHost, redisPort, maxGameTimeOut,sessionCompletionEvReceiver))
 }

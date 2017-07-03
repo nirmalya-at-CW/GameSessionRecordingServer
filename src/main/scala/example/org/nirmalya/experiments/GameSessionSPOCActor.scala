@@ -14,15 +14,18 @@ import scala.util.{Failure, Success}
 /**
   * Created by nirmalya on 20/6/17.
   */
-class GameSessionSPOCActor extends Actor with ActorLogging {
+class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor with ActorLogging {
 
   case object ShutYourself
 
 
   implicit val executionContext = context.dispatcher
   implicit val askTimeOutDuration:Timeout = Duration(3, "seconds")
-  val redisHost = context.system.settings.config.getConfig("GameSession.redisEndPoint").getString("host")
-  val redisPort = context.system.settings.config.getConfig("GameSession.redisEndPoint").getInt("port")
+  val (redisHost,redisPort) = (
+    context.system.settings.config.getConfig("GameSession.redisEndPoint").getString("host"),
+    context.system.settings.config.getConfig("GameSession.redisEndPoint").getInt("port")
+  )
+
   val maxGameTimeOut = FiniteDuration(
     context.system.settings.config.getConfig("GameSession.maxGameTimeOut").getInt("duration"),
     TimeUnit.SECONDS)
@@ -44,13 +47,12 @@ class GameSessionSPOCActor extends Actor with ActorLogging {
             gameSession,
             redisHost,
             redisPort,
-            maxGameTimeOut
+            maxGameTimeOut,
+            gameSessionFinishEmitter
           ), gameSession.toString)
         context.watch(child)
 
         this.activeGameSessionActors = this.activeGameSessionActors + Tuple2(r.toString,child)
-        println(activeGameSessionActors.mkString("|"))
-
 
         val confirmation = (child ? HuddleGame.EvStarted(System.currentTimeMillis(), gameSession)).mapTo[RecordingStatus]
         confirmation.onComplete {
@@ -142,5 +144,5 @@ class GameSessionSPOCActor extends Actor with ActorLogging {
 }
 
 object GameSessionSPOCActor {
-  def props = Props(new GameSessionSPOCActor)
+  def apply(gameSessionFinishEmitter: ActorRef): Props = Props(new GameSessionSPOCActor(gameSessionFinishEmitter))
 }
