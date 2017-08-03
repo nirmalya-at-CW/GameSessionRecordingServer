@@ -22,6 +22,7 @@ object GameSessionHandlingServiceProtocol {
       override def toString = company + "." + manager + "." + "playerID" + "." + gameName + "." + gameUUID
     }
     case class REQPlayAGameWith(sessionID: String, questionID: String, answerID: String, isCorrect: Boolean, score: Int)
+    case class REQPlayAClipWith(sessionID: String, clipName: String)
     case class REQPauseAGameWith(sessionID: String)
     case class REQEndAGameWith(sessionID: String)
     case class RESPFromGameSession(desc: String)
@@ -44,8 +45,9 @@ object GameSessionHandlingServiceProtocol {
   case class GameCreatedTupleInREDIS  (flag: String) extends GameInfoTupleInREDIS
   case class GameStartedTupleInREDIS  (t: Long) extends GameInfoTupleInREDIS
   case class GamePlayTupleInREDIS     (t: Long, questionAnswer: QuestionAnswerTuple) extends GameInfoTupleInREDIS
+  case class GameClipRunInREDIS       (t: Long, clipName: String) extends GameInfoTupleInREDIS
   case class GamePausedTupleInREDIS   (t: Long) extends GameInfoTupleInREDIS
-  case class GameEndedTupleInREDIS    (t:Long, gameEndingReason: String) extends GameInfoTupleInREDIS
+  case class GameEndedTupleInREDIS    (t: Long, gameEndingReason: String) extends GameInfoTupleInREDIS
 
   case class CompleteGamePlaySessionHistory(elems: List[GameInfoTupleInREDIS])
   object NonExistingCompleteGamePlaySessionHistory extends CompleteGamePlaySessionHistory(elems = List.empty)
@@ -56,6 +58,7 @@ object GameSessionHandlingServiceProtocol {
         classOf[GameCreatedTupleInREDIS],
         classOf[GameStartedTupleInREDIS],
         classOf[GamePlayTupleInREDIS],
+        classOf[GameClipRunInREDIS],
         classOf[GamePausedTupleInREDIS],
         classOf[QuestionAnswerTuple],
         classOf[GameEndedTupleInREDIS],
@@ -76,6 +79,7 @@ object GameSessionHandlingServiceProtocol {
 
     case class EvCreated(gameSession: GameSession) extends HuddleGameEvent
     case class EvStarted(startedAt: Long, gameSession: GameSession) extends  HuddleGameEvent
+    case class EvPlayingClip(beganPlayingAt: Long, clipName: String, gameSession: GameSession) extends HuddleGameEvent
     case class EvQuestionAnswered(receivedAt: Long, questionAndAnswer:QuestionAnswerTuple, gameSession: GameSession) extends HuddleGameEvent
     case class EvPaused(pausedAt: Long, gameSession: GameSession) extends HuddleGameEvent
     case class EvEnded(endedAt: Long, endedBy: GameEndingReason = GameEndedByPlayer, gameSession: GameSession) extends HuddleGameEvent
@@ -96,7 +100,7 @@ object GameSessionHandlingServiceProtocol {
 
   case class RecordingStatus(details: String)
 
-  case class EmitWhenGameSessionIsFinished(contents: String)
+  case class EmittedWhenGameSessionIsFinished(contents: String)
 
 
   trait RedisSessionStatus

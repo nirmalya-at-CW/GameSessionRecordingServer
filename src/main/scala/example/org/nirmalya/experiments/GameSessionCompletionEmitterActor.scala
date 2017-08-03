@@ -2,7 +2,7 @@ package example.org.nirmalya.experiments
 
 import akka.actor.{Actor, ActorLogging, Props}
 import com.mashape.unirest.http.Unirest
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.EmitWhenGameSessionIsFinished
+import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.EmittedWhenGameSessionIsFinished
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
@@ -17,7 +17,7 @@ class GameSessionCompletionEmitterActor (consumingEndpoints: List[String]) exten
 
   def receive = {
 
-    case EmitWhenGameSessionIsFinished(whatToEmit) =>
+    case EmittedWhenGameSessionIsFinished(whatToEmit) =>
 
       if (consumingEndpoints.isEmpty)
 
@@ -45,7 +45,7 @@ class GameSessionCompletionEmitterActor (consumingEndpoints: List[String]) exten
         })
       }
 
-    case x: Any => log.info("Unknown message ($x) received")
+    case x: Any => log.info(s"Unknown message ($x) received")
   }
 
 }

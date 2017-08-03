@@ -85,6 +85,30 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
           originalSender ! RecordingStatus(s"No session with ${r.sessionID} exists.")
       }
 
+    case r: ExternalAPIParams.REQPlayAClipWith =>
+
+      val gameSession = GameSession(r.sessionID, "Ignore")
+
+      val originalSender = sender()
+      activeGameSessionActors.get(r.sessionID) match {
+
+        case Some (sessionActor) =>
+
+          val confirmation =
+            (sessionActor ? HuddleGame.EvPlayingClip(
+              System.currentTimeMillis(),
+              r.clipName,
+              gameSession
+            )
+              ).mapTo[RecordingStatus]
+          confirmation.onComplete {
+            case Success(d) =>   originalSender ! d
+            case Failure(e) =>   originalSender ! RecordingStatus(e.getMessage)
+          }
+        case None                =>
+          originalSender ! RecordingStatus(s"No session with ${r.sessionID} exists.")
+      }
+
     case r: ExternalAPIParams.REQPauseAGameWith =>
       val gameSession = GameSession(r.sessionID, "Ignore")
 

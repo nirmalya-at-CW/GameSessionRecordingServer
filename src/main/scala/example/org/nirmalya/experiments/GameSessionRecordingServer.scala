@@ -19,9 +19,8 @@ import com.typesafe.config.ConfigFactory
 import scala.concurrent.duration.Duration
 import collection.JavaConversions._
 import scala.util.{Failure, Success, Try}
-
 import de.heikoseeberger.akkahttpjson4s.Json4sSupport
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.ExternalAPIParams.{REQEndAGameWith, REQPauseAGameWith, REQPlayAGameWith, REQStartAGameWith}
+import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.ExternalAPIParams._
 import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.RecordingStatus
 
 
@@ -150,6 +149,28 @@ object GameSessionRecordingServer {
               println(s"req: $reqPlayAGameWith")
               println("SPOC: " + sessionHandlingSPOC.path)
               (sessionHandlingSPOC ? reqPlayAGameWith).mapTo[RecordingStatus]
+            }
+          }
+        }
+      }
+    }
+  }
+
+  def playClipRoute(implicit mat: Materializer) = {
+    import akka.http.scaladsl.server.Directives._
+    import Json4sSupport._
+
+    implicit val serialization = native.Serialization
+    implicit val formats       = DefaultFormats
+
+    post {
+      logRequest("StartRequest") {
+        pathPrefix("playClip") {
+          entity(as[REQPlayAClipWith]) { reqPlayAClipWith =>
+            complete {
+              println(s"req: $reqPlayAClipWith")
+              println("SPOC: " + sessionHandlingSPOC.path)
+              (sessionHandlingSPOC ? reqPlayAClipWith).mapTo[RecordingStatus]
             }
           }
         }

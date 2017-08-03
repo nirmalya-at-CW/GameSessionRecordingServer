@@ -54,6 +54,11 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
                 )
        goto (HuddleGame.GameIsContinuingState)
 
+     case Event(aboutToPlayClip: HuddleGame.EvPlayingClip, _)  =>
+
+       sender ! recordThatClipIsPlayed(aboutToPlayClip.beganPlayingAt, aboutToPlayClip.clipName, aboutToPlayClip.gameSession)
+       goto (HuddleGame.GameIsContinuingState)
+
      case Event(paused: HuddleGame.EvPaused, _)                     =>
 
        sender ! recordAPauseOfTheGame(paused.pausedAt, paused.gameSession)
@@ -81,6 +86,11 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
        )
        stay
 
+     case Event(aboutToPlayClip: HuddleGame.EvPlayingClip, _)  =>
+
+       sender ! recordThatClipIsPlayed(aboutToPlayClip.beganPlayingAt, aboutToPlayClip.clipName, aboutToPlayClip.gameSession)
+       goto (HuddleGame.GameIsContinuingState)
+
      case Event(paused: HuddleGame.EvPaused, _)                     =>
 
        sender ! recordAPauseOfTheGame(paused.pausedAt, paused.gameSession)
@@ -99,43 +109,48 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
 
    }
 
-  when (HuddleGame.GameIsPausedState, this.maxGameTimeOut)  {
+   when (HuddleGame.GameIsPausedState, this.maxGameTimeOut)  {
 
-    case Event(questionAnswered: HuddleGame.EvQuestionAnswered, _) =>
-      sender ! recordThatAQuestionIsAnswered(
-        questionAnswered.receivedAt,
-        questionAnswered.questionAndAnswer,
-        questionAnswered.gameSession
-      )
-      goto (HuddleGame.GameIsContinuingState)
+      case Event(questionAnswered: HuddleGame.EvQuestionAnswered, _) =>
+        sender ! recordThatAQuestionIsAnswered(
+          questionAnswered.receivedAt,
+          questionAnswered.questionAndAnswer,
+          questionAnswered.gameSession
+        )
+        goto (HuddleGame.GameIsContinuingState)
 
-    case Event(ended: HuddleGame.EvEnded, _)                     =>
+      case Event(aboutToPlayClip: HuddleGame.EvPlayingClip, _)  =>
 
-      sender ! recordEndOfTheGame(ended.endedAt, ended.endedBy, ended.gameSession)
-      self ! HuddleGame.EvCleanUpRequired (ended.gameSession)
-      goto (HuddleGame.GameIsWrappingUpState)
+        sender ! recordThatClipIsPlayed(aboutToPlayClip.beganPlayingAt, aboutToPlayClip.clipName, aboutToPlayClip.gameSession)
+        goto (HuddleGame.GameIsContinuingState)
 
-    case Event(StateTimeout, sessionReqdForCleaningUp:DataToCleanUpRedis)  =>
+      case Event(ended: HuddleGame.EvEnded, _)                     =>
 
-      recordEndOfTheGame(System.currentTimeMillis, GameEndedByTimeOut, sessionReqdForCleaningUp.gameSession)
-      self ! HuddleGame.EvCleanUpRequired (sessionReqdForCleaningUp.gameSession)
-      goto (HuddleGame.GameIsWrappingUpState)
+        sender ! recordEndOfTheGame(ended.endedAt, ended.endedBy, ended.gameSession)
+        self ! HuddleGame.EvCleanUpRequired (ended.gameSession)
+        goto (HuddleGame.GameIsWrappingUpState)
 
-  }
+      case Event(StateTimeout, sessionReqdForCleaningUp:DataToCleanUpRedis)  =>
 
-  when (HuddleGame.GameIsWrappingUpState) {
+        recordEndOfTheGame(System.currentTimeMillis, GameEndedByTimeOut, sessionReqdForCleaningUp.gameSession)
+        self ! HuddleGame.EvCleanUpRequired (sessionReqdForCleaningUp.gameSession)
+        goto (HuddleGame.GameIsWrappingUpState)
 
-    case Event(cleanUp: HuddleGame.EvCleanUpRequired, _) =>
+    }
 
-      //Call REST endpoint to store the GameSession
+   when (HuddleGame.GameIsWrappingUpState) {
 
-      val currentRecord = this.extractCurrentGamePlayRecord(cleanUp.gameSession)
-      this.sessionCompletionEvReceiverActor ! currentRecord.details
+      case Event(cleanUp: HuddleGame.EvCleanUpRequired, _) =>
 
-      //TODO: Replace the if-check below, with a HOF
-       if (!this.cleanDataOnExit) removeGameSessionFromREDIS(cleanUp.gameSession)
-       stop(FSM.Normal, DataToCleanUpRedis(cleanUp.gameSession))
-  }
+        //Call REST endpoint to store the GameSession
+
+        val currentRecord = this.extractCurrentGamePlayRecord(cleanUp.gameSession)
+        this.sessionCompletionEvReceiverActor ! EmittedWhenGameSessionIsFinished(currentRecord.details)
+
+        //TODO: Replace the if-check below, with a HOF
+         if (!this.cleanDataOnExit) removeGameSessionFromREDIS(cleanUp.gameSession)
+         stop(FSM.Normal, DataToCleanUpRedis(cleanUp.gameSession))
+    }
 
   whenUnhandled {
 
@@ -194,6 +209,18 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
   }
 
   private
+  def recordThatClipIsPlayed(atServerClockTime: Long, clipName: String, gameSession: GameSession): RecordingStatus = {
+
+    RecordingStatus (
+      storeSessionHistory(gameSession,GameClipRunInREDIS(atServerClockTime,clipName)) match {
+
+        case f: FailedRedisSessionStatus => s"Failure: ${f.reason}, sessionID($gameSession), clip(${clipName}"
+        case OKRedisSessionStatus        => s"sessionID($gameSession), ClipPlayed(name:${{clipName}})."
+      }
+    )
+  }
+
+  private
   def recordThatAQuestionIsAnswered(
         atServerClockTime: Long, questionNAnswer: QuestionAnswerTuple, gameSession: GameSession): RecordingStatus = {
 
@@ -202,7 +229,7 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
     RecordingStatus (
       storeSessionHistory(gameSession,GamePlayTupleInREDIS(atServerClockTime,questionNAnswer)) match {
 
-        case f: FailedRedisSessionStatus => s"Failure: ${f.reason}, question(${questionNAnswer.questionID},${questionNAnswer.answerID}"
+        case f: FailedRedisSessionStatus => s"Failure: ${f.reason}, sessionID($gameSession), question(${questionNAnswer.questionID},${questionNAnswer.answerID}"
         case OKRedisSessionStatus        => s"sessionID($gameSession), Played(Q:${questionNAnswer.questionID},A:${questionNAnswer.answerID})."
       }
     )

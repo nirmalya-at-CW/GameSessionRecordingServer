@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import akka.testkit.{EventFilter, TestKit}
 import com.typesafe.config.ConfigFactory
 import example.org.nirmalya.experiments.GameSessionCompletionEmitterActor
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.EmitWhenGameSessionIsFinished
+import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.EmittedWhenGameSessionIsFinished
 
 import collection.JavaConversions._
 import org.scalatest.{BeforeAndAfterAll, MustMatchers, WordSpecLike}
@@ -40,7 +40,7 @@ class GameSessionCompletionEmitterActorTest
 
 
         EventFilter.info(pattern = "Emitted", occurrences = 1) intercept {
-          gameSessionCompletionEmitter ! EmitWhenGameSessionIsFinished("GameSession-Finished")
+          gameSessionCompletionEmitter ! EmittedWhenGameSessionIsFinished("GameSession-Finished")
         }
       }
 
@@ -55,7 +55,7 @@ class GameSessionCompletionEmitterActorTest
 
 
       EventFilter.info(pattern = "Failed:", occurrences = 1) intercept {
-        gameSessionCompletionEmitter ! EmitWhenGameSessionIsFinished("GameSession-Finished")
+        gameSessionCompletionEmitter ! EmittedWhenGameSessionIsFinished("GameSession-Finished")
       }
     }
   }
