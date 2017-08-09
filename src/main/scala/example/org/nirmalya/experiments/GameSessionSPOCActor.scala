@@ -5,7 +5,7 @@ import java.util.concurrent.TimeUnit
 import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
 import akka.pattern._
 import akka.util.Timeout
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.{ExternalAPIParams, GameEndedByPlayer, GameSession, HuddleGame, QuestionAnswerTuple, RecordingStatus}
+import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.{ExternalAPIParams, GameSessionEndedByPlayer, GameSession, HuddleGame, QuestionAnswerTuple, RecordingStatus}
 
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.util.{Failure, Success}
@@ -54,12 +54,36 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
 
         this.activeGameSessionActors = this.activeGameSessionActors + Tuple2(r.toString,child)
 
-        val confirmation = (child ? HuddleGame.EvStarted(System.currentTimeMillis(), gameSession)).mapTo[RecordingStatus]
+        val confirmation = (child ? HuddleGame.EvInitiated(System.currentTimeMillis(), gameSession)).mapTo[RecordingStatus]
         confirmation.onComplete {
           case Success(d) =>   originalSender ! d
           case Failure(e) =>   originalSender ! RecordingStatus(e.getMessage)
         }
       }
+
+    case r: ExternalAPIParams.REQSetQuizForGameWith =>
+
+      val gameSession = GameSession(r.sessionID, "Ignore")
+
+      val originalSender = sender()
+      activeGameSessionActors.get(r.sessionID) match {
+
+        case Some (sessionActor) =>
+
+          val confirmation =
+            (sessionActor ? HuddleGame.EvQuizIsFinalized(
+                                               System.currentTimeMillis(),
+                                               r.questions,
+                                               gameSession)
+            ).mapTo[RecordingStatus]
+          confirmation.onComplete {
+            case Success(d) =>   originalSender ! d
+            case Failure(e) =>   originalSender ! RecordingStatus(e.getMessage)
+          }
+        case None                =>
+          originalSender ! RecordingStatus(s"No session with ${r.sessionID} exists.")
+      }
+
 
     case r: ExternalAPIParams.REQPlayAGameWith =>
 
@@ -73,7 +97,13 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
           val confirmation =
             (sessionActor ? HuddleGame.EvQuestionAnswered(
                                           System.currentTimeMillis(),
-                                          QuestionAnswerTuple(r.questionID.toInt,r.answerID.toInt,r.isCorrect, r.score),
+                                          QuestionAnswerTuple(
+                                            r.questionID.toInt,
+                                            r.answerID.toInt,
+                                            r.isCorrect,
+                                            r.score,
+                                            r.timeSpentToAnswerAtFE
+                                          ),
                                           gameSession
                                        )
             ).mapTo[RecordingStatus]
@@ -96,11 +126,11 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
 
           val confirmation =
             (sessionActor ? HuddleGame.EvPlayingClip(
-              System.currentTimeMillis(),
-              r.clipName,
-              gameSession
-            )
-              ).mapTo[RecordingStatus]
+                                        System.currentTimeMillis(),
+                                         r.clipName,
+                                         gameSession
+                                       )
+            ).mapTo[RecordingStatus]
           confirmation.onComplete {
             case Success(d) =>   originalSender ! d
             case Failure(e) =>   originalSender ! RecordingStatus(e.getMessage)
@@ -137,7 +167,8 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
 
           val confirmation = (sessionActor ? HuddleGame.EvEnded(
                                                 System.currentTimeMillis(),
-                                                GameEndedByPlayer,
+                                                GameSessionEndedByPlayer,
+                                                r.totalTimeTakenByPlayer,
                                                 gameSession)
             ).mapTo[RecordingStatus]
           confirmation.onComplete {

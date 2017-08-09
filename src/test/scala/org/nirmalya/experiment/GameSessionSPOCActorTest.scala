@@ -2,7 +2,7 @@ package org.nirmalya.experiment
 
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestKit}
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.ExternalAPIParams.{REQPauseAGameWith, REQPlayAGameWith, REQStartAGameWith}
+import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.ExternalAPIParams.{REQPauseAGameWith, REQPlayAGameWith, REQSetQuizForGameWith, REQStartAGameWith}
 import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.{GameSession, QuestionAnswerTuple, RecordingStatus}
 import example.org.nirmalya.experiments.{GameSessionCompletionEmitterActor, GameSessionSPOCActor}
 import org.nirmalya.experiment.common.StopSystemAfterAll
@@ -26,10 +26,10 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
   val gameStartsAt = System.currentTimeMillis()
 
   val questionaAndAnswers = IndexedSeq(
-    QuestionAnswerTuple(1,1,true,10),
-    QuestionAnswerTuple(2,2,true,10),
-    QuestionAnswerTuple(3,3,false,0),
-    QuestionAnswerTuple(4,4,true,10)
+    QuestionAnswerTuple(1,1,true,10,2),
+    QuestionAnswerTuple(2,2,true,10,2),
+    QuestionAnswerTuple(3,3,false,0,3),
+    QuestionAnswerTuple(4,4,true,10,1)
   )
 
   val emitterActor = system.actorOf(GameSessionCompletionEmitterActor(List("http://httpbin.org/put")))
@@ -40,21 +40,20 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
 
     "indicate that a GamePlayRecorder Actor doesn't exist for a wrong session id" in {
 
-
-
       val spocActor = system.actorOf(GameSessionSPOCActor(emitterActor))
       spocActor ! REQPlayAGameWith(
                       inCorrectGameSession.toString,
                       questionaAndAnswers(0).questionID.toString,
                       questionaAndAnswers(0).answerID.toString,
                       questionaAndAnswers(0).isCorrect,
-                      questionaAndAnswers(0).points
+                      questionaAndAnswers(0).points,
+                      questionaAndAnswers(0).timeTakenToAnswerAtFE
                   )
 
       expectMsg(RecordingStatus(s"No session with ${inCorrectGameSession.toString} exists."))
     }
 
-    "confirms that a GamePlayRecorder Actor has started" in {
+    "confirm that a GamePlayRecorder Actor has started" in {
 
       val spocActor = system.actorOf(GameSessionSPOCActor(emitterActor))
 
@@ -62,10 +61,10 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
 
       spocActor ! req
 
-      expectMsg(RecordingStatus(s"sessionID(${req.toString}), Started."))
+      expectMsg(RecordingStatus(s"sessionID(${req.toString}), Created."))
     }
 
-    "confirms that a GamePlayRecorder Actor that has already started, has paused correctly" in {
+    "confirm that a GamePlayRecorder Actor that has already started, has paused correctly" in {
 
       val spocActor = system.actorOf(GameSessionSPOCActor(emitterActor))
 
@@ -73,7 +72,13 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
 
       spocActor ! reqStart
 
-      expectMsg(RecordingStatus(s"sessionID(${reqStart.toString}), Started."))
+      expectMsg(RecordingStatus(s"sessionID(${reqStart.toString}), Created."))
+
+      val reqQuizSetup = REQSetQuizForGameWith(reqStart.toString,List(1,2,3,4))
+
+      spocActor ! reqQuizSetup
+
+      expectMsg(RecordingStatus(s"sessionID(${reqStart.toString}), Quiz set up (1|2|3|4)."))
 
       val reqPause = REQPauseAGameWith(reqStart.toString)
 
@@ -95,7 +100,13 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
 
       spocActor ! reqStart
 
-      expectMsg(RecordingStatus(s"sessionID(${reqStart.toString}), Started."))
+      expectMsg(RecordingStatus(s"sessionID(${reqStart.toString}), Created."))
+
+      val reqQuizSetup = REQSetQuizForGameWith(reqStart.toString,List(1,2,3,4))
+
+      spocActor ! reqQuizSetup
+
+      expectMsg(RecordingStatus(s"sessionID(${reqStart.toString}), Quiz set up (1|2|3|4)."))
 
       val reqPause = REQPauseAGameWith(reqStart.toString)
 
@@ -113,7 +124,8 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
                             questionaAndAnswers(0).questionID.toString,
                             questionaAndAnswers(0).answerID.toString,
                             questionaAndAnswers(0).isCorrect,
-                            questionaAndAnswers(0).points
+                            questionaAndAnswers(0).points,
+                            questionaAndAnswers(0).timeTakenToAnswerAtFE
       )
 
       spocActor ! reqPlay
@@ -131,7 +143,8 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
         questionaAndAnswers(1).questionID.toString,
         questionaAndAnswers(1).answerID.toString,
         questionaAndAnswers(1).isCorrect,
-        questionaAndAnswers(1).points
+        questionaAndAnswers(1).points,
+        2
       )
 
       spocActor ! reqPlayAgain

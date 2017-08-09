@@ -78,12 +78,16 @@ object GameSessionRecordingServer {
       System.exit(-1)
     }
 
-    val bindingFuture: Future[ServerBinding] =
-      Http().bindAndHandle(route, serviceHost, servicePort)
+    Http().bindAndHandle(route, serviceHost, servicePort).map(f => {
 
-    bindingFuture.failed.foreach { ex =>
-      println(ex, "Failed to bind to {}:{}!", serviceHost, servicePort)
+      println(s"GameSessionRecordingServer: started at @$serviceHost:$servicePort")
+    }). recover {
+      case ex: Exception =>
+        println(s"Error: GameSessionRecordingServer fails to start @$serviceHost:$servicePort, reason: ${ex.getMessage}")
     }
+
+    // TODO
+    // How to stop the Server cleanly?
   }
 
   private def isRedisReachable(redisHost: String,redisPort: Int): Boolean = {

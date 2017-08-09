@@ -19,22 +19,25 @@ object GameSessionHandlingServiceProtocol {
   object ExternalAPIParams {
 
     case class REQStartAGameWith(company: String, manager: String, playerID: String, gameName: String, gameUUID: String) {
-      override def toString = company + "." + manager + "." + "playerID" + "." + gameName + "." + gameUUID
+      override def toString = company + "." + manager + "." + playerID + "." + gameName + "." + gameUUID
     }
-    case class REQPlayAGameWith(sessionID: String, questionID: String, answerID: String, isCorrect: Boolean, score: Int)
+    case class REQSetQuizForGameWith(sessionID: String, questions: List[Int] )
+    case class REQPlayAGameWith(sessionID: String, questionID: String, answerID: String, isCorrect: Boolean, score: Int, timeSpentToAnswerAtFE: Int)
     case class REQPlayAClipWith(sessionID: String, clipName: String)
     case class REQPauseAGameWith(sessionID: String)
-    case class REQEndAGameWith(sessionID: String)
+    case class REQEndAGameWith(sessionID: String, totalTimeTakenByPlayer: Int)
     case class RESPFromGameSession(desc: String)
   }
 
-  sealed trait GameEndingReason
-  case object  GameEndedByPlayer extends GameEndingReason
-  case object  GameEndedByTimeOut extends GameEndingReason
+  sealed trait GameSessionEndingReason
+  case object  GameSessionEndedByPlayer extends GameSessionEndingReason
+  case object  GameSessionEndedByTimeOut extends GameSessionEndingReason
+  case object  GameSessionCreatedButNotStarted extends GameSessionEndingReason
+  case object  GameSessionEndedByManager extends GameSessionEndingReason
 
 
   case class GameChosen(company: String, manager: String, playerID: String, gameName: String)
-  case class QuestionAnswerTuple(questionID: Int, answerID: Int, isCorrect: Boolean, points: Int)
+  case class QuestionAnswerTuple(questionID: Int, answerID: Int, isCorrect: Boolean, points: Int, timeTakenToAnswerAtFE: Int)
 
   case class GameSession(sessionID: String, playerID: String) {
     override def toString = sessionID
@@ -42,12 +45,13 @@ object GameSessionHandlingServiceProtocol {
 
   sealed trait GameInfoTupleInREDIS
 
-  case class GameCreatedTupleInREDIS  (flag: String) extends GameInfoTupleInREDIS
-  case class GameStartedTupleInREDIS  (t: Long) extends GameInfoTupleInREDIS
-  case class GamePlayTupleInREDIS     (t: Long, questionAnswer: QuestionAnswerTuple) extends GameInfoTupleInREDIS
-  case class GameClipRunInREDIS       (t: Long, clipName: String) extends GameInfoTupleInREDIS
-  case class GamePausedTupleInREDIS   (t: Long) extends GameInfoTupleInREDIS
-  case class GameEndedTupleInREDIS    (t: Long, gameEndingReason: String) extends GameInfoTupleInREDIS
+  case class GameCreatedTupleInREDIS     (flag: String) extends GameInfoTupleInREDIS
+  case class GameInitiatedTupleInREDIS   (t: Long) extends GameInfoTupleInREDIS
+  case class GamePreparedTupleInREDIS    (t: Long, questionIDs: List[Int]) extends GameInfoTupleInREDIS
+  case class GamePlayedTupleInREDIS      (t: Long, questionAnswer: QuestionAnswerTuple) extends GameInfoTupleInREDIS
+  case class GameClipRunInREDIS          (t: Long, clipName: String) extends GameInfoTupleInREDIS
+  case class GamePausedTupleInREDIS      (t: Long) extends GameInfoTupleInREDIS
+  case class GameEndedTupleInREDIS       (t: Long, gameEndingReason: String, totalTimeTakenByPlayer: Int) extends GameInfoTupleInREDIS
 
   case class CompleteGamePlaySessionHistory(elems: List[GameInfoTupleInREDIS])
   object NonExistingCompleteGamePlaySessionHistory extends CompleteGamePlaySessionHistory(elems = List.empty)
@@ -56,12 +60,13 @@ object GameSessionHandlingServiceProtocol {
     ShortTypeHints(
       List(
         classOf[GameCreatedTupleInREDIS],
-        classOf[GameStartedTupleInREDIS],
-        classOf[GamePlayTupleInREDIS],
+        classOf[GameInitiatedTupleInREDIS],
+        classOf[GamePlayedTupleInREDIS],
         classOf[GameClipRunInREDIS],
         classOf[GamePausedTupleInREDIS],
         classOf[QuestionAnswerTuple],
         classOf[GameEndedTupleInREDIS],
+        classOf[GamePreparedTupleInREDIS],
         classOf[GameChosen],
         classOf[REQStartAGameWith],
         classOf[RecordingStatus]
@@ -78,23 +83,26 @@ object GameSessionHandlingServiceProtocol {
     sealed trait HuddleGameEvent
 
     case class EvCreated(gameSession: GameSession) extends HuddleGameEvent
-    case class EvStarted(startedAt: Long, gameSession: GameSession) extends  HuddleGameEvent
+    case class EvInitiated(startedAt: Long, gameSession: GameSession) extends  HuddleGameEvent
+    case class EvQuizIsFinalized(finalizedAt: Long, questionIDs: List[Int], gameSession: GameSession) extends  HuddleGameEvent
     case class EvPlayingClip(beganPlayingAt: Long, clipName: String, gameSession: GameSession) extends HuddleGameEvent
     case class EvQuestionAnswered(receivedAt: Long, questionAndAnswer:QuestionAnswerTuple, gameSession: GameSession) extends HuddleGameEvent
     case class EvPaused(pausedAt: Long, gameSession: GameSession) extends HuddleGameEvent
-    case class EvEnded(endedAt: Long, endedBy: GameEndingReason = GameEndedByPlayer, gameSession: GameSession) extends HuddleGameEvent
+    case class EvEnded(endedAt: Long, endedBy: GameSessionEndingReason = GameSessionEndedByPlayer, totalTimeTakenByPlayer: Int, gameSession: GameSession) extends HuddleGameEvent
     case class EvCleanUpRequired(gameSession: GameSession) extends HuddleGameEvent
     case class EvGamePlayRecordSoFarRequired(gameSession: GameSession) extends HuddleGameEvent
+    case object EvGameShouldHaveStartedByNow extends HuddleGameEvent
 
 
-    sealed trait HuddleGameState
+    sealed trait HuddleGameSessionState
 
-    case object GameYetToStartState   extends HuddleGameState
-    case object GameHasStartedState   extends HuddleGameState
-    case object GameIsContinuingState extends HuddleGameState
-    case object GameIsPausedState     extends HuddleGameState
-    case object GameHasEndedState     extends HuddleGameState
-    case object GameIsWrappingUpState extends HuddleGameState
+    case object GameSessionYetToStartState      extends HuddleGameSessionState
+    case object GameSessionIsBeingPreparedState extends HuddleGameSessionState
+    case object GameSessionHasStartedState      extends HuddleGameSessionState
+    case object GameSessionIsContinuingState    extends HuddleGameSessionState
+    case object GameSessionIsPausedState        extends HuddleGameSessionState
+    case object GameSessionHasEndedState        extends HuddleGameSessionState
+    case object GameSessionIsWrappingUpState    extends HuddleGameSessionState
 
   }
 

@@ -1,17 +1,16 @@
 package example.org.nirmalya.experiments
 
-
-import java.util.concurrent.TimeUnit
-
 import akka.actor.{ActorLogging, ActorRef, FSM, Props}
 import com.redis.RedisClient
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.HuddleGame._
 import GameSessionHandlingServiceProtocol.{HuddleGame, NonExistingCompleteGamePlaySessionHistory, RecordingStatus, _}
+import GameSessionHandlingServiceProtocol.HuddleGame._
 import org.json4s._
 import org.json4s.native.JsonMethods._
 import org.json4s.native.Serialization.{read, write}
 
 import scala.concurrent.duration.{Duration, FiniteDuration, TimeUnit}
+
+import scala.concurrent.ExecutionContext.Implicits.global
 
 
 /**
@@ -23,27 +22,53 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
                             val redisPort: Int,
                             val maxGameTimeOut: FiniteDuration,
                             val sessionCompletionEvReceiverActor: ActorRef
-                           ) extends FSM [HuddleGameState, HuddleGameFSMData] with ActorLogging {
+                           ) extends FSM [HuddleGameSessionState, HuddleGameFSMData] with ActorLogging {
 
   //TODO
-  // 1) Pick Redis configurationn values from Akka Config, instead of hardcoding
-  // 2) Pick Timeout value from Akka config, instead of hardcoding
+  // 1) Pick Timeout value from Akka config, instead of hardcoding
+  // 2) We need to manage the connection pool of REDIS. Important.
 
 
   val redisClient = new RedisClient(redisHost, redisPort)
 
-   startWith(GameYetToStartState, DataToBeginWith)
+  // It is possible that even after a GameSession is created, the Player never plays. We don't want the GameSession to hang around,
+  // needlessly. So, to deal with such a case, we schedule a reminder, so that after a expiration of a maximum timeout duration,
+  // the Actor is destroyed.
+  val gameNeverStartedIndicator = context.system.scheduler.scheduleOnce(this.maxGameTimeOut, self, HuddleGame.EvGameShouldHaveStartedByNow)
 
-   when (HuddleGame.GameYetToStartState, this.maxGameTimeOut) {
+   startWith(GameSessionYetToStartState, DataToBeginWith)
 
-     case Event(gameStarted: HuddleGame.EvStarted, _) =>
+   when (HuddleGame.GameSessionYetToStartState, this.maxGameTimeOut) {
 
+     case Event(gameStarted: HuddleGame.EvInitiated, _) =>
+
+          this.gameNeverStartedIndicator.cancel
           sender ! recordStartOfTheGame(gameStarted.startedAt, gameStarted.gameSession)
-          goto (HuddleGame.GameHasStartedState) using DataToCleanUpRedis(gameStarted.gameSession)
+          goto (HuddleGame.GameSessionIsBeingPreparedState) using DataToCleanUpRedis(gameStarted.gameSession)
+
+     case Event(HuddleGame.EvGameShouldHaveStartedByNow, _ ) =>
+
+       recordEndOfTheGame(System.currentTimeMillis, GameSessionCreatedButNotStarted, -1, seededWithSession)
+       self ! HuddleGame.EvCleanUpRequired (seededWithSession)
+       goto (HuddleGame.GameSessionIsWrappingUpState)
 
    }
 
-   when (HuddleGame.GameHasStartedState, this.maxGameTimeOut) {
+   when (HuddleGame.GameSessionIsBeingPreparedState, this.maxGameTimeOut) {
+
+     case Event(setOfQuestions: EvQuizIsFinalized, _)   =>
+
+       sender ! recordQuizSet(setOfQuestions.finalizedAt, setOfQuestions.questionIDs, setOfQuestions.gameSession)
+       goto (HuddleGame.GameSessionHasStartedState)
+
+     case Event(StateTimeout, sessionReqdForCleaningUp:DataToCleanUpRedis)  =>
+
+       recordEndOfTheGame(System.currentTimeMillis, GameSessionEndedByTimeOut, -1, sessionReqdForCleaningUp.gameSession)
+       self ! HuddleGame.EvCleanUpRequired (sessionReqdForCleaningUp.gameSession)
+       goto (HuddleGame.GameSessionIsWrappingUpState)
+   }
+
+   when (HuddleGame.GameSessionHasStartedState, this.maxGameTimeOut) {
 
      case Event(questionAnswered: HuddleGame.EvQuestionAnswered, _) =>
 
@@ -52,31 +77,31 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
                       questionAnswered.questionAndAnswer,
                       questionAnswered.gameSession
                 )
-       goto (HuddleGame.GameIsContinuingState)
+       goto (HuddleGame.GameSessionIsContinuingState)
 
      case Event(aboutToPlayClip: HuddleGame.EvPlayingClip, _)  =>
 
        sender ! recordThatClipIsPlayed(aboutToPlayClip.beganPlayingAt, aboutToPlayClip.clipName, aboutToPlayClip.gameSession)
-       goto (HuddleGame.GameIsContinuingState)
+       goto (HuddleGame.GameSessionIsContinuingState)
 
      case Event(paused: HuddleGame.EvPaused, _)                     =>
 
        sender ! recordAPauseOfTheGame(paused.pausedAt, paused.gameSession)
-       goto (HuddleGame.GameIsPausedState)
+       goto (HuddleGame.GameSessionIsPausedState)
 
      case Event(ended: HuddleGame.EvEnded, _)                     =>
 
-       sender ! recordEndOfTheGame(ended.endedAt, ended.endedBy, ended.gameSession)
-       goto (HuddleGame.GameIsWrappingUpState)
+       sender ! recordEndOfTheGame(ended.endedAt, ended.endedBy, ended.totalTimeTakenByPlayer, ended.gameSession)
+       goto (HuddleGame.GameSessionIsWrappingUpState)
 
      case Event(StateTimeout, sessionReqdForCleaningUp:DataToCleanUpRedis)  =>
-       recordEndOfTheGame(System.currentTimeMillis, GameEndedByTimeOut, sessionReqdForCleaningUp.gameSession)
+       recordEndOfTheGame(System.currentTimeMillis, GameSessionEndedByTimeOut, -1, sessionReqdForCleaningUp.gameSession)
        self ! HuddleGame.EvCleanUpRequired (sessionReqdForCleaningUp.gameSession)
-       goto (HuddleGame.GameIsWrappingUpState)
+       goto (HuddleGame.GameSessionIsWrappingUpState)
 
    }
 
-   when (HuddleGame.GameIsContinuingState, this.maxGameTimeOut)  {
+   when (HuddleGame.GameSessionIsContinuingState, this.maxGameTimeOut)  {
 
      case Event(questionAnswered: HuddleGame.EvQuestionAnswered, _) =>
        sender ! recordThatAQuestionIsAnswered(
@@ -89,27 +114,27 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
      case Event(aboutToPlayClip: HuddleGame.EvPlayingClip, _)  =>
 
        sender ! recordThatClipIsPlayed(aboutToPlayClip.beganPlayingAt, aboutToPlayClip.clipName, aboutToPlayClip.gameSession)
-       goto (HuddleGame.GameIsContinuingState)
+       goto (HuddleGame.GameSessionIsContinuingState)
 
      case Event(paused: HuddleGame.EvPaused, _)                     =>
 
        sender ! recordAPauseOfTheGame(paused.pausedAt, paused.gameSession)
-       goto (HuddleGame.GameIsPausedState)
+       goto (HuddleGame.GameSessionIsPausedState)
 
      case Event(ended: HuddleGame.EvEnded, _)                     =>
 
-       sender ! recordEndOfTheGame(ended.endedAt, ended.endedBy, ended.gameSession)
+       sender ! recordEndOfTheGame(ended.endedAt, ended.endedBy, ended.totalTimeTakenByPlayer, ended.gameSession)
        self ! HuddleGame.EvCleanUpRequired (ended.gameSession)
-       goto (HuddleGame.GameIsWrappingUpState)
+       goto (HuddleGame.GameSessionIsWrappingUpState)
 
      case Event(StateTimeout, sessionReqdForCleaningUp:DataToCleanUpRedis)  =>
-       recordEndOfTheGame(System.currentTimeMillis, GameEndedByTimeOut, sessionReqdForCleaningUp.gameSession)
+       recordEndOfTheGame(System.currentTimeMillis, GameSessionEndedByTimeOut, -1, sessionReqdForCleaningUp.gameSession)
        self ! HuddleGame.EvCleanUpRequired (sessionReqdForCleaningUp.gameSession)
-       goto (HuddleGame.GameIsWrappingUpState)
+       goto (HuddleGame.GameSessionIsWrappingUpState)
 
    }
 
-   when (HuddleGame.GameIsPausedState, this.maxGameTimeOut)  {
+   when (HuddleGame.GameSessionIsPausedState, this.maxGameTimeOut)  {
 
       case Event(questionAnswered: HuddleGame.EvQuestionAnswered, _) =>
         sender ! recordThatAQuestionIsAnswered(
@@ -117,28 +142,28 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
           questionAnswered.questionAndAnswer,
           questionAnswered.gameSession
         )
-        goto (HuddleGame.GameIsContinuingState)
+        goto (HuddleGame.GameSessionIsContinuingState)
 
       case Event(aboutToPlayClip: HuddleGame.EvPlayingClip, _)  =>
 
         sender ! recordThatClipIsPlayed(aboutToPlayClip.beganPlayingAt, aboutToPlayClip.clipName, aboutToPlayClip.gameSession)
-        goto (HuddleGame.GameIsContinuingState)
+        goto (HuddleGame.GameSessionIsContinuingState)
 
       case Event(ended: HuddleGame.EvEnded, _)                     =>
 
-        sender ! recordEndOfTheGame(ended.endedAt, ended.endedBy, ended.gameSession)
+        sender ! recordEndOfTheGame(ended.endedAt, ended.endedBy, ended.totalTimeTakenByPlayer, ended.gameSession)
         self ! HuddleGame.EvCleanUpRequired (ended.gameSession)
-        goto (HuddleGame.GameIsWrappingUpState)
+        goto (HuddleGame.GameSessionIsWrappingUpState)
 
       case Event(StateTimeout, sessionReqdForCleaningUp:DataToCleanUpRedis)  =>
 
-        recordEndOfTheGame(System.currentTimeMillis, GameEndedByTimeOut, sessionReqdForCleaningUp.gameSession)
+        recordEndOfTheGame(System.currentTimeMillis, GameSessionEndedByTimeOut, -1, sessionReqdForCleaningUp.gameSession)
         self ! HuddleGame.EvCleanUpRequired (sessionReqdForCleaningUp.gameSession)
-        goto (HuddleGame.GameIsWrappingUpState)
+        goto (HuddleGame.GameSessionIsWrappingUpState)
 
     }
 
-   when (HuddleGame.GameIsWrappingUpState) {
+   when (HuddleGame.GameSessionIsWrappingUpState) {
 
       case Event(cleanUp: HuddleGame.EvCleanUpRequired, _) =>
 
@@ -162,7 +187,7 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
              sender ! extractCurrentGamePlayRecord(gameSession)
 
         case _  =>
-          log.info(s"Unknown message of type ${m.getClass}, in ${FSM.CurrentState}")
+          log.info(s"Unknown message of type ${m.getClass}, in ${this.stateName}")
       }
 
       stay
@@ -170,7 +195,7 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
 
   onTransition {
 
-    case HuddleGame.GameYetToStartState -> HuddleGame.GameHasStartedState =>
+    case HuddleGame.GameSessionYetToStartState -> HuddleGame.GameSessionHasStartedState =>
       log.info("Transition from GameYetToStart GameHasStarted")
   }
 
@@ -187,6 +212,20 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
   private
   def gameSessionAlreadyExists (gameSession: GameSession): Boolean = this.redisClient.exists(gameSession)
 
+  private def
+  recordQuizSet (atServerClockTime: Long, questionIDs: List[Int], gameSession: GameSession): RecordingStatus = {
+
+    RecordingStatus (
+      storeSessionHistory(gameSession,GamePreparedTupleInREDIS(atServerClockTime,questionIDs)) match {
+
+        case f: FailedRedisSessionStatus =>
+          s"Failure: ${f.reason}, sessionID($gameSession), questionSet(${questionIDs.mkString("|")}"
+        case OKRedisSessionStatus        =>
+          s"sessionID($gameSession), Quiz set up (${questionIDs.mkString("|")})."
+      }
+    )
+  }
+
 
   private
   def recordStartOfTheGame(atServerClockTime: Long, gameSession: GameSession): RecordingStatus = {
@@ -200,10 +239,10 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
     this.redisClient.hset(gameSession, "SessionHistory", completeSessionSoFar)
 
     RecordingStatus (
-          storeSessionHistory(gameSession,GameStartedTupleInREDIS(atServerClockTime)) match {
+          storeSessionHistory(gameSession,GameInitiatedTupleInREDIS(atServerClockTime)) match {
 
             case f: FailedRedisSessionStatus => s"Failure: ${f.reason}"
-            case OKRedisSessionStatus        => s"sessionID($gameSession), Started."
+            case OKRedisSessionStatus        => s"sessionID($gameSession), Created."
           })
 
   }
@@ -227,7 +266,7 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
     // val playTuple = GamePlayTuple(atServerClockTime,questionNAnswer)
 
     RecordingStatus (
-      storeSessionHistory(gameSession,GamePlayTupleInREDIS(atServerClockTime,questionNAnswer)) match {
+      storeSessionHistory(gameSession,GamePlayedTupleInREDIS(atServerClockTime,questionNAnswer)) match {
 
         case f: FailedRedisSessionStatus => s"Failure: ${f.reason}, sessionID($gameSession), question(${questionNAnswer.questionID},${questionNAnswer.answerID}"
         case OKRedisSessionStatus        => s"sessionID($gameSession), Played(Q:${questionNAnswer.questionID},A:${questionNAnswer.answerID})."
@@ -250,10 +289,12 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
 
   private
   def recordEndOfTheGame(
-            atServerClockTime: Long, endedHow: GameEndingReason, gameSession: GameSession): RecordingStatus = {
+            atServerClockTime: Long, endedHow: GameSessionEndingReason, totalTimeTakenByPlayer: Int, gameSession: GameSession
+  ): RecordingStatus = {
+
 
     RecordingStatus (
-      storeSessionHistory(gameSession,GameEndedTupleInREDIS(atServerClockTime, endedHow.toString)) match {
+      storeSessionHistory(gameSession,GameEndedTupleInREDIS(atServerClockTime, endedHow.toString,totalTimeTakenByPlayer )) match {
 
         case f: FailedRedisSessionStatus => s"Failure: ${f.reason}"
         case OKRedisSessionStatus        => s"sessionID($gameSession), Ended."
