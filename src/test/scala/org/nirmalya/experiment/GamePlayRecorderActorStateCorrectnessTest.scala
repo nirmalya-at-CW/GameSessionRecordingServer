@@ -137,7 +137,7 @@ class GamePlayRecorderActorStateCorrectnessTest extends TestKit(ActorSystem("Hud
         case Transition(_, GameSessionYetToStartState, GameSessionIsBeingPreparedState) => true
       }
 
-      gamePlayRecorderActor ! HuddleGame.EvQuizIsFinalized(gameStartsAt + 3, List(1,4,5,9), gameSession)
+      gamePlayRecorderActor ! HuddleGame.EvQuizIsFinalized(gameStartsAt + 3, "some metedata", gameSession)
 
       testProbe.expectMsgPF(2 second) {
         case Transition(_, GameSessionIsBeingPreparedState, GameSessionHasStartedState) => true
@@ -169,7 +169,7 @@ class GamePlayRecorderActorStateCorrectnessTest extends TestKit(ActorSystem("Hud
         case Transition(_, GameSessionYetToStartState, GameSessionIsBeingPreparedState) => true
       }
 
-      gamePlayRecorderActor ! HuddleGame.EvQuizIsFinalized(gameStartsAt + 3, List(1,4,5,9), gameSession)
+      gamePlayRecorderActor ! HuddleGame.EvQuizIsFinalized(gameStartsAt + 3, List(1,4,5,9).mkString("|"), gameSession)
       testProbe.expectMsgPF(2 second) {
         case Transition(_, GameSessionIsBeingPreparedState, GameSessionHasStartedState) => true
       }
@@ -206,7 +206,7 @@ class GamePlayRecorderActorStateCorrectnessTest extends TestKit(ActorSystem("Hud
         case Transition(_, GameSessionYetToStartState, GameSessionIsBeingPreparedState) => true
       }
 
-      gamePlayRecorderActor ! HuddleGame.EvQuizIsFinalized(gameStartsAt + 2, List(1,4,5,9), gameSession)
+      gamePlayRecorderActor ! HuddleGame.EvQuizIsFinalized(gameStartsAt + 2, List(1,4,5,9).mkString("|"), gameSession)
       testProbe.expectMsgPF(2 second) {
         case Transition(_, GameSessionIsBeingPreparedState, GameSessionHasStartedState) => true
       }
@@ -247,7 +247,7 @@ class GamePlayRecorderActorStateCorrectnessTest extends TestKit(ActorSystem("Hud
       }
 
 
-      gamePlayRecorderActor ! HuddleGame.EvQuizIsFinalized(gameStartsAt + 4, List(1,4,5,9), gameSession)
+      gamePlayRecorderActor ! HuddleGame.EvQuizIsFinalized(gameStartsAt + 4, List(1,4,5,9).mkString("|"), gameSession)
       testProbe.expectMsgPF(2 second) {
         case Transition(_, GameSessionIsBeingPreparedState, GameSessionHasStartedState) => true
       }
@@ -288,7 +288,7 @@ class GamePlayRecorderActorStateCorrectnessTest extends TestKit(ActorSystem("Hud
         case Transition(_, GameSessionYetToStartState, GameSessionIsBeingPreparedState) => true
       }
 
-      gamePlayRecorderActor ! HuddleGame.EvQuizIsFinalized(gameStartsAt + 2, List(1,4,5,9), gameSession)
+      gamePlayRecorderActor ! HuddleGame.EvQuizIsFinalized(gameStartsAt + 2, List(1,4,5,9).mkString("|"), gameSession)
       testProbe.expectMsgPF(2 second) {
         case Transition(_, GameSessionIsBeingPreparedState, GameSessionHasStartedState) => true
       }
@@ -325,7 +325,7 @@ class GamePlayRecorderActorStateCorrectnessTest extends TestKit(ActorSystem("Hud
             case Transition(_, GameSessionYetToStartState, GameSessionIsBeingPreparedState) => true
           }
 
-          gamePlayRecorderActor ! HuddleGame.EvQuizIsFinalized(gameStartsAt + 2, List(1,4,5,9), gameSession)
+          gamePlayRecorderActor ! HuddleGame.EvQuizIsFinalized(gameStartsAt + 2, List(1,4,5,9).mkString("|"), gameSession)
           testProbe.expectMsgPF(2 second) {
             case Transition(_, GameSessionIsBeingPreparedState, GameSessionHasStartedState) => true
           }
@@ -362,7 +362,7 @@ class GamePlayRecorderActorStateCorrectnessTest extends TestKit(ActorSystem("Hud
       }
 
       gamePlayRecorderActor ! HuddleGame.EvInitiated(gameStartsAt, gameSession)
-      gamePlayRecorderActor ! HuddleGame.EvQuizIsFinalized(gameStartsAt + 2, List(1,4,5,9), gameSession)
+      gamePlayRecorderActor ! HuddleGame.EvQuizIsFinalized(gameStartsAt + 2, List(1,4,5,9).mkString("|"), gameSession)
       gamePlayRecorderActor ! HuddleGame.EvPaused(gameStartsAt + 4, gameSession)
       gamePlayRecorderActor ! HuddleGame.EvQuestionAnswered(gameStartsAt + 6, questionaAndAnswers(3), gameSession)
 

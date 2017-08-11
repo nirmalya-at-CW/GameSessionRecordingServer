@@ -51,9 +51,13 @@ object GameSessionRecordingServer {
 
   def main(args: Array[String]) {
 
-    val special = Logging(underlyingActorSystem, "SpecialRoutes")
+    val logger = Logging(underlyingActorSystem, getClass)
 
-    val route: Route = startRoute ~ playRoute ~ pauseRoute ~ endRoute
+    val route: Route = {
+      logRequestResult("GameSessionRecorderService") {
+        startRoute ~ prepareRoute ~ playRoute ~ pauseRoute ~ endRoute
+      }
+    }
 
 
 
@@ -123,7 +127,6 @@ object GameSessionRecordingServer {
 
     // TODO: I still don't know how to log the HTTP Requests and Responses, by using Directives!
     post {
-      logRequest("StartRequest") {
         pathPrefix("start") {
           entity(as[REQStartAGameWith]) { reqStartAGameWith =>
             complete {
@@ -132,6 +135,26 @@ object GameSessionRecordingServer {
               (sessionHandlingSPOC ? reqStartAGameWith).mapTo[RecordingStatus]
 
             }
+          }
+        }
+    }
+  }
+
+  def prepareRoute(implicit mat: Materializer) = {
+    import akka.http.scaladsl.server.Directives._
+    import Json4sSupport._
+
+    implicit val serialization = native.Serialization
+    implicit val formats       = DefaultFormats
+
+    post {
+      pathPrefix("prepare") {
+        entity(as[REQSetQuizForGameWith]) { reqSetQuizForGameWith: REQSetQuizForGameWith =>
+          complete {
+            println(s"req: $reqSetQuizForGameWith")
+            println("SPOC: " + sessionHandlingSPOC.path)
+            (sessionHandlingSPOC ? reqSetQuizForGameWith).mapTo[RecordingStatus]
+
           }
         }
       }
@@ -146,7 +169,6 @@ object GameSessionRecordingServer {
     implicit val formats       = DefaultFormats
 
     post {
-      logRequest("StartRequest") {
         pathPrefix("play") {
           entity(as[REQPlayAGameWith]) { reqPlayAGameWith =>
             complete {
@@ -156,7 +178,6 @@ object GameSessionRecordingServer {
             }
           }
         }
-      }
     }
   }
 
@@ -168,7 +189,6 @@ object GameSessionRecordingServer {
     implicit val formats       = DefaultFormats
 
     post {
-      logRequest("StartRequest") {
         pathPrefix("playClip") {
           entity(as[REQPlayAClipWith]) { reqPlayAClipWith =>
             complete {
@@ -178,7 +198,6 @@ object GameSessionRecordingServer {
             }
           }
         }
-      }
     }
   }
 
@@ -190,7 +209,6 @@ object GameSessionRecordingServer {
     implicit val formats       = DefaultFormats
 
     post {
-      logRequest("StartRequest") {
         pathPrefix("pause") {
           entity(as[REQPauseAGameWith]) { reqPauseAGameWith =>
             complete {
@@ -199,7 +217,6 @@ object GameSessionRecordingServer {
             }
           }
         }
-      }
     }
   }
 
@@ -211,7 +228,6 @@ object GameSessionRecordingServer {
     implicit val formats       = DefaultFormats
 
     post {
-      logRequest("StartRequest") {
         pathPrefix("end") {
           entity(as[REQEndAGameWith]) { reqEndAGameWith =>
             complete {
@@ -220,7 +236,6 @@ object GameSessionRecordingServer {
             }
           }
         }
-      }
     }
   }
 }

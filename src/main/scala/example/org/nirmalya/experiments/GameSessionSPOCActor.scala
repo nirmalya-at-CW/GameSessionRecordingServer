@@ -73,7 +73,7 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
           val confirmation =
             (sessionActor ? HuddleGame.EvQuizIsFinalized(
                                                System.currentTimeMillis(),
-                                               r.questions,
+                                               r.questionMetadata,
                                                gameSession)
             ).mapTo[RecordingStatus]
           confirmation.onComplete {
@@ -101,7 +101,7 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
                                             r.questionID.toInt,
                                             r.answerID.toInt,
                                             r.isCorrect,
-                                            r.score,
+                                            r.points,
                                             r.timeSpentToAnswerAtFE
                                           ),
                                           gameSession
@@ -168,7 +168,7 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
           val confirmation = (sessionActor ? HuddleGame.EvEnded(
                                                 System.currentTimeMillis(),
                                                 GameSessionEndedByPlayer,
-                                                r.totalTimeTakenByPlayer,
+                                                r.totalTimeTakenByPlayerAtFE,
                                                 gameSession)
             ).mapTo[RecordingStatus]
           confirmation.onComplete {

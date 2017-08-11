@@ -57,7 +57,7 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
 
       val spocActor = system.actorOf(GameSessionSPOCActor(emitterActor))
 
-      val req = REQStartAGameWith("Codewalla","Boss","minion","tic-tac-toe","A123")
+      val req = REQStartAGameWith("Codewalla","1","Boss","minion","1","tic-tac-toe","A123")
 
       spocActor ! req
 
@@ -68,13 +68,13 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
 
       val spocActor = system.actorOf(GameSessionSPOCActor(emitterActor))
 
-      val reqStart = REQStartAGameWith("Codewalla","Boss","minion","tic-tac-toe","A1234")
+      val reqStart = REQStartAGameWith("Codewalla","1","Boss","minion","1","tic-tac-toe","A1234")
 
       spocActor ! reqStart
 
       expectMsg(RecordingStatus(s"sessionID(${reqStart.toString}), Created."))
 
-      val reqQuizSetup = REQSetQuizForGameWith(reqStart.toString,List(1,2,3,4))
+      val reqQuizSetup = REQSetQuizForGameWith(reqStart.toString,List(1,2,3,4).mkString("|"))
 
       spocActor ! reqQuizSetup
 
@@ -96,13 +96,13 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
 
       val spocActor = system.actorOf(GameSessionSPOCActor(emitterActor))
 
-      val reqStart = REQStartAGameWith("Codewalla","Boss","minion","tic-tac-toe","A12345")
+      val reqStart = REQStartAGameWith("Codewalla","1","Boss","minion","1","tic-tac-toe","A12345")
 
       spocActor ! reqStart
 
       expectMsg(RecordingStatus(s"sessionID(${reqStart.toString}), Created."))
 
-      val reqQuizSetup = REQSetQuizForGameWith(reqStart.toString,List(1,2,3,4))
+      val reqQuizSetup = REQSetQuizForGameWith(reqStart.toString,List(1,2,3,4).mkString("|"))
 
       spocActor ! reqQuizSetup
 

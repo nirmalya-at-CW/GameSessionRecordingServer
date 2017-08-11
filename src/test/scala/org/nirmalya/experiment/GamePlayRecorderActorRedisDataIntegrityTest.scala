@@ -129,8 +129,8 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
       gamePlayRecorderActor ! HuddleGame.EvInitiated(gameStartsAt, gameSession)
       expectMsg(RecordingStatus(s"sessionID($gameSession), Created."))
 
-      gamePlayRecorderActor ! HuddleGame.EvQuizIsFinalized(gameStartsAt+1,List(1,2,3,4),gameSession)
-      expectMsg(RecordingStatus(s"sessionID($gameSession), Quiz set up (1|2|3|4)."))
+      gamePlayRecorderActor ! HuddleGame.EvQuizIsFinalized(gameStartsAt+1,"Some metadata",gameSession)
+      expectMsg(RecordingStatus(s"sessionID($gameSession), Quiz set up (Some metadata)."))
 
       gamePlayRecorderActor ! HuddleGame.EvQuestionAnswered(gameStartsAt+2,questionaAndAnswers(0),gameSession)
       expectMsg(
@@ -184,7 +184,7 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
           aStartedTuple.t shouldEqual (gameStartsAt)
 
           val aPreparedTuple1 = completeHistory.elems.toIndexedSeq(2).asInstanceOf[GamePreparedTupleInREDIS]
-          aPreparedTuple1.questionIDs shouldEqual List(1,2,3,4)
+          aPreparedTuple1.questionMetadata shouldEqual "Some metadata"
 
           val aPlayTuple1 = completeHistory.elems.toIndexedSeq(3).asInstanceOf[GamePlayedTupleInREDIS]
           aPlayTuple1.questionAnswer shouldEqual (questionaAndAnswers(0))
@@ -224,7 +224,7 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
       gamePlayRecorderActor ! HuddleGame.EvInitiated(gameStartsAt, gameSession)
       expectMsg(RecordingStatus(s"sessionID($gameSession), Created."))
 
-      gamePlayRecorderActor ! HuddleGame.EvQuizIsFinalized(gameStartsAt+1,List(1,2,3,4),gameSession)
+      gamePlayRecorderActor ! HuddleGame.EvQuizIsFinalized(gameStartsAt+1,List(1,2,3,4).mkString("|"),gameSession)
       expectMsg(RecordingStatus(s"sessionID($gameSession), Quiz set up (1|2|3|4)."))
 
       gamePlayRecorderActor ! HuddleGame.EvQuestionAnswered(gameStartsAt+2,questionaAndAnswers(0),gameSession)
@@ -308,7 +308,7 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
       gamePlayRecorderActor ! HuddleGame.EvInitiated(gameStartsAt, gameSession)
       expectMsg(RecordingStatus(s"sessionID($gameSession), Created."))
 
-      gamePlayRecorderActor ! HuddleGame.EvQuizIsFinalized(gameStartsAt+1,List(1,2,3,4),gameSession)
+      gamePlayRecorderActor ! HuddleGame.EvQuizIsFinalized(gameStartsAt+1,List(1,2,3,4).mkString("|"),gameSession)
       expectMsg(RecordingStatus(s"sessionID($gameSession), Quiz set up (1|2|3|4)."))
 
 

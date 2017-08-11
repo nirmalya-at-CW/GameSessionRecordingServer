@@ -58,7 +58,7 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
 
      case Event(setOfQuestions: EvQuizIsFinalized, _)   =>
 
-       sender ! recordQuizSet(setOfQuestions.finalizedAt, setOfQuestions.questionIDs, setOfQuestions.gameSession)
+       sender ! recordQuizSet(setOfQuestions.finalizedAt, setOfQuestions.questionMetadata, setOfQuestions.gameSession)
        goto (HuddleGame.GameSessionHasStartedState)
 
      case Event(StateTimeout, sessionReqdForCleaningUp:DataToCleanUpRedis)  =>
@@ -213,15 +213,15 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
   def gameSessionAlreadyExists (gameSession: GameSession): Boolean = this.redisClient.exists(gameSession)
 
   private def
-  recordQuizSet (atServerClockTime: Long, questionIDs: List[Int], gameSession: GameSession): RecordingStatus = {
+  recordQuizSet (atServerClockTime: Long, questionMetadata: String, gameSession: GameSession): RecordingStatus = {
 
     RecordingStatus (
-      storeSessionHistory(gameSession,GamePreparedTupleInREDIS(atServerClockTime,questionIDs)) match {
+      storeSessionHistory(gameSession,GamePreparedTupleInREDIS(atServerClockTime,questionMetadata)) match {
 
         case f: FailedRedisSessionStatus =>
-          s"Failure: ${f.reason}, sessionID($gameSession), questionSet(${questionIDs.mkString("|")}"
+          s"Failure: ${f.reason}, sessionID($gameSession), Metadata:(${questionMetadata}"
         case OKRedisSessionStatus        =>
-          s"sessionID($gameSession), Quiz set up (${questionIDs.mkString("|")})."
+          s"sessionID($gameSession), Quiz set up (${questionMetadata})."
       }
     )
   }

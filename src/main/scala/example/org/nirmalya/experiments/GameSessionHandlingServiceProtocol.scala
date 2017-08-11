@@ -18,15 +18,26 @@ object GameSessionHandlingServiceProtocol {
 
   object ExternalAPIParams {
 
-    case class REQStartAGameWith(company: String, manager: String, playerID: String, gameName: String, gameUUID: String) {
-      override def toString = company + "." + manager + "." + playerID + "." + gameName + "." + gameUUID
+    case class REQStartAGameWith(companyName: String, companyID: String, manager: String, playerID: String, gameID: String, gameName: String, gameSessionUUID: String) {
+      override def toString =
+        new StringBuffer().append(companyID)      .append(".")
+                          .append(companyName)    .append(".")
+                          .append(manager)        .append(".")
+                          .append(playerID)       .append(".")
+                          .append(gameID)         .append(".")
+                          .append(gameName)       .append(".")
+                          .append(gameSessionUUID)
+        .toString
     }
-    case class REQSetQuizForGameWith(sessionID: String, questions: List[Int] )
-    case class REQPlayAGameWith(sessionID: String, questionID: String, answerID: String, isCorrect: Boolean, score: Int, timeSpentToAnswerAtFE: Int)
+    case class REQSetQuizForGameWith(sessionID: String, questionMetadata: String )
+    case class REQPlayAGameWith(sessionID: String, questionID: String, answerID: String, isCorrect: Boolean, points: Int, timeSpentToAnswerAtFE: Int)
     case class REQPlayAClipWith(sessionID: String, clipName: String)
     case class REQPauseAGameWith(sessionID: String)
-    case class REQEndAGameWith(sessionID: String, totalTimeTakenByPlayer: Int)
-    case class RESPFromGameSession(desc: String)
+    case class REQEndAGameWith(sessionID: String, totalTimeTakenByPlayerAtFE: Int)
+
+    case class ExpandedMessage (successId: Int, description: String)
+    case class OutcomeContent  (game_session_id: String)
+    case class RESPGameSession (opSuccess: Boolean, message: ExpandedMessage, contents: OutcomeContent)
   }
 
   sealed trait GameSessionEndingReason
@@ -47,7 +58,7 @@ object GameSessionHandlingServiceProtocol {
 
   case class GameCreatedTupleInREDIS     (flag: String) extends GameInfoTupleInREDIS
   case class GameInitiatedTupleInREDIS   (t: Long) extends GameInfoTupleInREDIS
-  case class GamePreparedTupleInREDIS    (t: Long, questionIDs: List[Int]) extends GameInfoTupleInREDIS
+  case class GamePreparedTupleInREDIS    (t: Long, questionMetadata: String) extends GameInfoTupleInREDIS
   case class GamePlayedTupleInREDIS      (t: Long, questionAnswer: QuestionAnswerTuple) extends GameInfoTupleInREDIS
   case class GameClipRunInREDIS          (t: Long, clipName: String) extends GameInfoTupleInREDIS
   case class GamePausedTupleInREDIS      (t: Long) extends GameInfoTupleInREDIS
@@ -84,7 +95,7 @@ object GameSessionHandlingServiceProtocol {
 
     case class EvCreated(gameSession: GameSession) extends HuddleGameEvent
     case class EvInitiated(startedAt: Long, gameSession: GameSession) extends  HuddleGameEvent
-    case class EvQuizIsFinalized(finalizedAt: Long, questionIDs: List[Int], gameSession: GameSession) extends  HuddleGameEvent
+    case class EvQuizIsFinalized(finalizedAt: Long, questionMetadata: String, gameSession: GameSession) extends  HuddleGameEvent
     case class EvPlayingClip(beganPlayingAt: Long, clipName: String, gameSession: GameSession) extends HuddleGameEvent
     case class EvQuestionAnswered(receivedAt: Long, questionAndAnswer:QuestionAnswerTuple, gameSession: GameSession) extends HuddleGameEvent
     case class EvPaused(pausedAt: Long, gameSession: GameSession) extends HuddleGameEvent
