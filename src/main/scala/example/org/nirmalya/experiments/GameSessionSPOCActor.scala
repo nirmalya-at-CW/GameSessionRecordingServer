@@ -21,7 +21,7 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
 
 
   implicit val executionContext = context.dispatcher
-  
+
   implicit val askTimeOutDuration:Timeout = Duration(
     context.system.settings.config.
       getConfig("GameSession.maxResponseTimeLimit").

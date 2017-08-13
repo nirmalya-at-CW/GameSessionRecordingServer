@@ -50,7 +50,12 @@ object GameSessionRecordingServer {
     .actorOf(GameSessionSPOCActor(gameSessionCompletionEmitter), "GameSessionSPOC")
 
   implicit val askTimeOutDuration:Timeout =
-    Duration( config.getConfig("GameSession.externalServices"), "seconds")
+    Duration(
+      underlyingActorSystem.settings.config.
+        getConfig("GameSession.maxResponseTimeLimit").
+        getString("duration").
+        toInt,
+      "seconds")
 
   def main(args: Array[String]) {
 
