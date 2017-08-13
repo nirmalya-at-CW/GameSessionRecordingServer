@@ -2,10 +2,9 @@ package example.org.nirmalya.experiments
 
 import java.util.UUID
 
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.ExternalAPIParams.REQStartAGameWith
+import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.ExternalAPIParams.{REQStartAGameWith, RESPGameSessionBody}
 import org.json4s.{DefaultFormats, Formats, ShortTypeHints}
 import org.json4s.native.Serialization
-
 import de.heikoseeberger.akkahttpjson4s.Json4sSupport
 
 /**
@@ -36,8 +35,8 @@ object GameSessionHandlingServiceProtocol {
     case class REQEndAGameWith(sessionID: String, totalTimeTakenByPlayerAtFE: Int)
 
     case class ExpandedMessage (successId: Int, description: String)
-    case class OutcomeContent  (game_session_id: String)
-    case class RESPGameSession (opSuccess: Boolean, message: ExpandedMessage, contents: OutcomeContent)
+    case class Supplementary(dataCarried: Map[String,String])
+    case class RESPGameSessionBody(opSuccess: Boolean, message: ExpandedMessage, contents: Option[Map[String,String]]=None)
   }
 
   sealed trait GameSessionEndingReason
@@ -80,7 +79,8 @@ object GameSessionHandlingServiceProtocol {
         classOf[GamePreparedTupleInREDIS],
         classOf[GameChosen],
         classOf[REQStartAGameWith],
-        classOf[RecordingStatus]
+        classOf[RecordingStatus],
+        classOf[RESPGameSessionBody]
       )
     )
   )

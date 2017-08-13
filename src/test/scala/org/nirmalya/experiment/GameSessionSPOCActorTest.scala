@@ -2,7 +2,7 @@ package org.nirmalya.experiment
 
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestKit}
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.ExternalAPIParams.{REQPauseAGameWith, REQPlayAGameWith, REQSetQuizForGameWith, REQStartAGameWith}
+import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.ExternalAPIParams._
 import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.{GameSession, QuestionAnswerTuple, RecordingStatus}
 import example.org.nirmalya.experiments.{GameSessionCompletionEmitterActor, GameSessionSPOCActor}
 import org.nirmalya.experiment.common.StopSystemAfterAll
@@ -50,10 +50,14 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
                       questionaAndAnswers(0).timeTakenToAnswerAtFE
                   )
 
-      expectMsg(RecordingStatus(s"No session with ${inCorrectGameSession.toString} exists."))
+      expectMsg(
+        RESPGameSessionBody(
+          false,
+          ExpandedMessage(1300,s"No gameSession (${inCorrectGameSession}) exists"))
+      )
     }
 
-    "confirm that a GamePlayRecorder Actor has started" in {
+    "confirm that a GamePlayRecorder Actor has initiated" in {
 
       val spocActor = system.actorOf(GameSessionSPOCActor(emitterActor))
 
@@ -61,7 +65,13 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
 
       spocActor ! req
 
-      expectMsg(RecordingStatus(s"sessionID(${req.toString}), Created."))
+      expectMsg(
+        RESPGameSessionBody(
+                    true,
+                    ExpandedMessage(2100,"Initiated"),
+                    Some(Map("gameSessionID" -> req.toString))
+        )
+      )
     }
 
     "confirm that a GamePlayRecorder Actor that has already started, has paused correctly" in {
@@ -72,23 +82,35 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
 
       spocActor ! reqStart
 
-      expectMsg(RecordingStatus(s"sessionID(${reqStart.toString}), Created."))
+      expectMsg(
+        RESPGameSessionBody(
+          true,
+          ExpandedMessage(2100,"Initiated"),
+          Some(Map("gameSessionID" -> reqStart.toString))
+        )
+      )
 
       val reqQuizSetup = REQSetQuizForGameWith(reqStart.toString,List(1,2,3,4).mkString("|"))
 
       spocActor ! reqQuizSetup
 
-      expectMsg(RecordingStatus(s"sessionID(${reqStart.toString}), Quiz set up (1|2|3|4)."))
+      expectMsg(
+        RESPGameSessionBody(
+          true,
+          ExpandedMessage(2200,"Prepared")
+        )
+      )
 
       val reqPause = REQPauseAGameWith(reqStart.toString)
 
       spocActor ! reqPause
 
       expectMsgPF (Duration(3, "second")) {
-        case m:RecordingStatus =>
-          m.details.contains("Game session (${reqStart.toString})") &&
-          m.details.contains("Pause") &&
-          m.details.contains("recorded")
+        case m:RESPGameSessionBody =>
+          m.opSuccess == true &&
+          m.message.successId == 2200 &&
+          m.message.description ==  ("Paused") &&
+          m.contents == None
       }
     }
 
@@ -100,23 +122,35 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
 
       spocActor ! reqStart
 
-      expectMsg(RecordingStatus(s"sessionID(${reqStart.toString}), Created."))
+      expectMsg(
+        RESPGameSessionBody(
+          true,
+          ExpandedMessage(2100,"Initiated"),
+          Some(Map("gameSessionID" -> reqStart.toString))
+        )
+      )
 
       val reqQuizSetup = REQSetQuizForGameWith(reqStart.toString,List(1,2,3,4).mkString("|"))
 
       spocActor ! reqQuizSetup
 
-      expectMsg(RecordingStatus(s"sessionID(${reqStart.toString}), Quiz set up (1|2|3|4)."))
+      expectMsg(
+        RESPGameSessionBody(
+          true,
+          ExpandedMessage(2200,"Prepared")
+        )
+      )
 
       val reqPause = REQPauseAGameWith(reqStart.toString)
 
       spocActor ! reqPause
 
       expectMsgPF (Duration(3, "second")) {
-        case m:RecordingStatus =>
-          m.details.contains("Game session (${reqStart.toString})") &&
-            m.details.contains("Pause") &&
-            m.details.contains("recorded")
+        case m:RESPGameSessionBody =>
+          m.opSuccess == true &&
+            m.message.successId == 2200 &&
+            m.message.description ==  ("Paused") &&
+            m.contents == None
       }
 
       val reqPlay =  REQPlayAGameWith(
@@ -131,11 +165,15 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
       spocActor ! reqPlay
 
       expectMsgPF (Duration(3, "second")) {
-        case m:RecordingStatus =>
-          m.details == (s"Game session ($reqStart.toString), question(${questionaAndAnswers(0).questionID},${questionaAndAnswers(0).answerID} recorded")
+        case m:RESPGameSessionBody =>
+          m.opSuccess == true &&
+            m.message.successId == 2200 &&
+            m.message.description ==  ("QuestionAnswered") &&
+            m.contents == None
       }
 
       // 10 Seconds is hardcoded at the moment, as the duration for timeout in GamePlayRecorder's FSM
+      // We expect the GameSession to have finished by the time we send a request again later.
       expectNoMsg(Duration(10, "second"))
 
       val reqPlayAgain =  REQPlayAGameWith(
@@ -150,8 +188,10 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
       spocActor ! reqPlayAgain
 
       expectMsgPF (Duration(3, "second")) {
-        case m:RecordingStatus =>
-          m.details == (s"No session with ${reqStart.toString} exists.")
+        case m:RESPGameSessionBody =>
+          m.opSuccess == false &&
+            m.message.successId == 1300 &&
+            m.message.description ==  (s"No gameSession (${reqStart.toString}) exists")
       }
 
     }

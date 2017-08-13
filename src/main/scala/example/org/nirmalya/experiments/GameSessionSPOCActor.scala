@@ -5,7 +5,8 @@ import java.util.concurrent.TimeUnit
 import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
 import akka.pattern._
 import akka.util.Timeout
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.{ExternalAPIParams, GameSessionEndedByPlayer, GameSession, HuddleGame, QuestionAnswerTuple, RecordingStatus}
+import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.ExternalAPIParams.{ExpandedMessage, RESPGameSessionBody, Supplementary}
+import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.{ExternalAPIParams, GameSession, GameSessionEndedByPlayer, HuddleGame, QuestionAnswerTuple, RecordingStatus}
 
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.util.{Failure, Success}
@@ -20,14 +21,22 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
 
 
   implicit val executionContext = context.dispatcher
-  implicit val askTimeOutDuration:Timeout = Duration(3, "seconds")
+  
+  implicit val askTimeOutDuration:Timeout = Duration(
+    context.system.settings.config.
+      getConfig("GameSession.maxResponseTimeLimit").
+      getString("duration").
+      toInt,
+    "seconds")
+
+
   val (redisHost,redisPort) = (
     context.system.settings.config.getConfig("GameSession.redisEndPoint").getString("host"),
     context.system.settings.config.getConfig("GameSession.redisEndPoint").getInt("port")
   )
 
-  val maxGameTimeOut = FiniteDuration(
-    context.system.settings.config.getConfig("GameSession.maxGameTimeOut").getInt("duration"),
+  val maxGameSessionLifetime = FiniteDuration(
+    context.system.settings.config.getConfig("GameSession.maxGameSessionLifetime").getInt("duration"),
     TimeUnit.SECONDS)
 
   var activeGameSessionActors: Map[String, ActorRef] = Map.empty
@@ -38,7 +47,9 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
       val gameSession = GameSession(r.toString, "Ignore")
 
       if (activeGameSessionActors.isDefinedAt(r.toString))
-        sender ! RecordingStatus(s"GameSession with $r is already active.")
+        sender ! RESPGameSessionBody(
+                    false,
+                    ExpandedMessage(1200, s"GameSession with $r is already active."))
       else {
         val originalSender = sender()
         val child = context.actorOf(
@@ -47,7 +58,7 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
             gameSession,
             redisHost,
             redisPort,
-            maxGameTimeOut,
+            maxGameSessionLifetime,
             gameSessionFinishEmitter
           ), gameSession.toString)
         context.watch(child)
@@ -56,8 +67,17 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
 
         val confirmation = (child ? HuddleGame.EvInitiated(System.currentTimeMillis(), gameSession)).mapTo[RecordingStatus]
         confirmation.onComplete {
-          case Success(d) =>   originalSender ! d
-          case Failure(e) =>   originalSender ! RecordingStatus(e.getMessage)
+          case Success(d) =>
+               originalSender ! RESPGameSessionBody(
+                                         true,
+                                         ExpandedMessage(2100, d.details),
+                                         Some(Map("gameSessionID" -> gameSession.toString))
+                                )
+          case Failure(e) =>
+               originalSender ! RESPGameSessionBody(
+                                         false,
+                                         ExpandedMessage(1200, e.getMessage)
+                                )
         }
       }
 
@@ -77,11 +97,22 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
                                                gameSession)
             ).mapTo[RecordingStatus]
           confirmation.onComplete {
-            case Success(d) =>   originalSender ! d
-            case Failure(e) =>   originalSender ! RecordingStatus(e.getMessage)
+            case Success(d) =>
+              originalSender ! RESPGameSessionBody(
+                                    true,
+                                    ExpandedMessage(2200, d.details)
+                               )
+            case Failure(e) =>
+              originalSender ! RESPGameSessionBody(
+                                    false,
+                                    ExpandedMessage(1200, e.getMessage)
+                              )
           }
         case None                =>
-          originalSender ! RecordingStatus(s"No session with ${r.sessionID} exists.")
+          originalSender ! RESPGameSessionBody(
+                                  false,
+                                  ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists")
+                           )
       }
 
 
@@ -108,11 +139,22 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
                                        )
             ).mapTo[RecordingStatus]
           confirmation.onComplete {
-            case Success(d) =>   originalSender ! d
-            case Failure(e) =>   originalSender ! RecordingStatus(e.getMessage)
+            case Success(d) =>
+              originalSender ! RESPGameSessionBody(
+                                      true,
+                                      ExpandedMessage(2200, d.details)
+                               )
+            case Failure(e) =>
+              originalSender ! RESPGameSessionBody(
+                                      false,
+                                      ExpandedMessage(1200, e.getMessage)
+                               )
           }
         case None                =>
-          originalSender ! RecordingStatus(s"No session with ${r.sessionID} exists.")
+          originalSender ! RESPGameSessionBody(
+            false,
+            ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists")
+          )
       }
 
     case r: ExternalAPIParams.REQPlayAClipWith =>
@@ -132,11 +174,22 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
                                        )
             ).mapTo[RecordingStatus]
           confirmation.onComplete {
-            case Success(d) =>   originalSender ! d
-            case Failure(e) =>   originalSender ! RecordingStatus(e.getMessage)
+            case Success(d) =>
+              originalSender ! RESPGameSessionBody(
+                                  true,
+                                  ExpandedMessage(2200, d.details)
+                               )
+            case Failure(e) =>
+              originalSender ! RESPGameSessionBody(
+                                  false,
+                                  ExpandedMessage(1200, e.getMessage)
+                               )
           }
         case None                =>
-          originalSender ! RecordingStatus(s"No session with ${r.sessionID} exists.")
+          originalSender ! RESPGameSessionBody(
+            false,
+            ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists")
+          )
       }
 
     case r: ExternalAPIParams.REQPauseAGameWith =>
@@ -149,11 +202,22 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
 
           val confirmation = (sessionActor ? HuddleGame.EvPaused(System.currentTimeMillis(), gameSession)).mapTo[RecordingStatus]
           confirmation.onComplete {
-            case Success(d) =>   originalSender ! d
-            case Failure(e) =>   originalSender ! RecordingStatus(e.getMessage)
+            case Success(d) =>
+              originalSender ! RESPGameSessionBody(
+                                  true,
+                                  ExpandedMessage(2200, d.details)
+                               )
+            case Failure(e) =>
+              originalSender ! RESPGameSessionBody(
+                                    false,
+                                    ExpandedMessage(1200, e.getMessage)
+                               )
           }
         case None                =>
-          originalSender ! RecordingStatus(s"No session with ${r.sessionID} exists.")
+          originalSender ! RESPGameSessionBody(
+            false,
+            ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists")
+          )
       }
 
     case r: ExternalAPIParams.REQEndAGameWith =>
@@ -172,11 +236,22 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
                                                 gameSession)
             ).mapTo[RecordingStatus]
           confirmation.onComplete {
-            case Success(d) =>   originalSender ! d
-            case Failure(e) =>   originalSender ! RecordingStatus(e.getMessage)
+            case Success(d) =>
+              originalSender ! RESPGameSessionBody(
+                                    true,
+                                    ExpandedMessage(2200, d.details)
+                               )
+            case Failure(e) =>
+              originalSender ! RESPGameSessionBody(
+                                    false,
+                                    ExpandedMessage(1200, e.getMessage)
+                               )
           }
         case None                =>
-          originalSender ! RecordingStatus(s"No session with ${r.sessionID} exists.")
+          originalSender ! RESPGameSessionBody(
+            false,
+            ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists")
+          )
       }
 
     // TODO: Revisit the following handler. What is the best way to remember the session that the this

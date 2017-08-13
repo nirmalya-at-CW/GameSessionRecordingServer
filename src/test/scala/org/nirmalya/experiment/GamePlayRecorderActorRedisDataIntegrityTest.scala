@@ -87,7 +87,7 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
 
       gamePlayRecorderActor ! HuddleGame.EvInitiated(gameStartsAt, gameSession)
 
-      expectMsg(RecordingStatus(s"sessionID($gameSession), Created."))
+      expectMsg(RecordingStatus("Initiated"))
 
       gamePlayRecorderActor ! HuddleGame.EvGamePlayRecordSoFarRequired(gameSession)
 
@@ -127,28 +127,21 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
           ),actorName)
 
       gamePlayRecorderActor ! HuddleGame.EvInitiated(gameStartsAt, gameSession)
-      expectMsg(RecordingStatus(s"sessionID($gameSession), Created."))
+      expectMsg(RecordingStatus("Initiated"))
 
       gamePlayRecorderActor ! HuddleGame.EvQuizIsFinalized(gameStartsAt+1,"Some metadata",gameSession)
-      expectMsg(RecordingStatus(s"sessionID($gameSession), Quiz set up (Some metadata)."))
+      expectMsg(RecordingStatus("Prepared"))
 
       gamePlayRecorderActor ! HuddleGame.EvQuestionAnswered(gameStartsAt+2,questionaAndAnswers(0),gameSession)
-      expectMsg(
-        RecordingStatus(
-          s"sessionID($gameSession), Played(Q:${questionaAndAnswers(0).questionID},A:${questionaAndAnswers(0).answerID})."))
+      expectMsg(RecordingStatus("QuestionAnswered"))
 
 
       gamePlayRecorderActor ! HuddleGame.EvPaused(gameStartsAt+3,gameSession)
-      expectMsg(
-        RecordingStatus(
-          s"sessionID($gameSession), Paused."))
+      expectMsg(RecordingStatus("Paused"))
 
 
       gamePlayRecorderActor ! HuddleGame.EvQuestionAnswered(gameStartsAt+4,questionaAndAnswers(1),gameSession)
-      expectMsg(
-        RecordingStatus(
-          s"sessionID($gameSession), Played(Q:${questionaAndAnswers(1).questionID},A:${questionaAndAnswers(1).answerID})."))
-
+      expectMsg(RecordingStatus("QuestionAnswered"))
 
       gamePlayRecorderActor ! HuddleGame.EvEnded(
                                            gameStartsAt+5,
@@ -160,7 +153,7 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
 
         case m: RecordingStatus =>
 
-          m.details should be (s"sessionID($gameSession), Ended.")
+          m.details should be ("Ended")
       }
 
       val history = redisClient.hget(gameSession, "SessionHistory")
@@ -222,21 +215,16 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
       )
 
       gamePlayRecorderActor ! HuddleGame.EvInitiated(gameStartsAt, gameSession)
-      expectMsg(RecordingStatus(s"sessionID($gameSession), Created."))
+      expectMsg(RecordingStatus("Initiated"))
 
       gamePlayRecorderActor ! HuddleGame.EvQuizIsFinalized(gameStartsAt+1,List(1,2,3,4).mkString("|"),gameSession)
-      expectMsg(RecordingStatus(s"sessionID($gameSession), Quiz set up (1|2|3|4)."))
+      expectMsg(RecordingStatus("Prepared"))
 
       gamePlayRecorderActor ! HuddleGame.EvQuestionAnswered(gameStartsAt+2,questionaAndAnswers(0),gameSession)
-      expectMsg(
-        RecordingStatus(
-          s"sessionID($gameSession), Played(Q:${questionaAndAnswers(0).questionID},A:${questionaAndAnswers(0).answerID})."))
-
+      expectMsg(RecordingStatus("QuestionAnswered"))
 
       gamePlayRecorderActor ! HuddleGame.EvPaused(gameStartsAt+3,gameSession)
-      expectMsg(
-        RecordingStatus(
-          s"sessionID($gameSession), Paused."))
+      expectMsg(RecordingStatus("Paused"))
 
       // Successive Pause, will be ignored by the GameSession's FSM
       gamePlayRecorderActor ! HuddleGame.EvPaused(gameStartsAt+4,gameSession)
@@ -247,7 +235,7 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
       expectMsgPF(2 second) {
 
         case m: RecordingStatus =>
-          m.details should be (s"sessionID($gameSession), Ended.")
+          m.details should be ("Ended")
       }
 
       val history = redisClient.hget(gameSession, "SessionHistory")
@@ -306,22 +294,17 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
       )
 
       gamePlayRecorderActor ! HuddleGame.EvInitiated(gameStartsAt, gameSession)
-      expectMsg(RecordingStatus(s"sessionID($gameSession), Created."))
+      expectMsg(RecordingStatus("Initiated"))
 
       gamePlayRecorderActor ! HuddleGame.EvQuizIsFinalized(gameStartsAt+1,List(1,2,3,4).mkString("|"),gameSession)
-      expectMsg(RecordingStatus(s"sessionID($gameSession), Quiz set up (1|2|3|4)."))
+      expectMsg(RecordingStatus("Prepared"))
 
 
       gamePlayRecorderActor ! HuddleGame.EvQuestionAnswered(gameStartsAt+2,questionaAndAnswers(0),gameSession)
-      expectMsg(
-        RecordingStatus(
-          s"sessionID($gameSession), Played(Q:${questionaAndAnswers(0).questionID},A:${questionaAndAnswers(0).answerID})."))
-
+      expectMsg(RecordingStatus("QuestionAnswered"))
 
       gamePlayRecorderActor ! HuddleGame.EvPaused(gameStartsAt+3,gameSession)
-      expectMsg(
-        RecordingStatus(
-          s"sessionID($gameSession), Paused."))
+      expectMsg(RecordingStatus("Paused"))
 
       awaitCond(
         {

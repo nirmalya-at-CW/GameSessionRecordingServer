@@ -20,7 +20,7 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
                             val seededWithSession: GameSession,
                             val redisHost: String,
                             val redisPort: Int,
-                            val maxGameTimeOut: FiniteDuration,
+                            val maxGameSessionLifetime: FiniteDuration,
                             val sessionCompletionEvReceiverActor: ActorRef
                            ) extends FSM [HuddleGameSessionState, HuddleGameFSMData] with ActorLogging {
 
@@ -34,17 +34,17 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
   // It is possible that even after a GameSession is created, the Player never plays. We don't want the GameSession to hang around,
   // needlessly. So, to deal with such a case, we schedule a reminder, so that after a expiration of a maximum timeout duration,
   // the Actor is destroyed.
-  val gameNeverStartedIndicator = context.system.scheduler.scheduleOnce(this.maxGameTimeOut, self, HuddleGame.EvGameShouldHaveStartedByNow)
+  val gameNeverStartedIndicator = context.system.scheduler.scheduleOnce(this.maxGameSessionLifetime, self, HuddleGame.EvGameShouldHaveStartedByNow)
 
    startWith(GameSessionYetToStartState, DataToBeginWith)
 
-   when (HuddleGame.GameSessionYetToStartState, this.maxGameTimeOut) {
+   when (HuddleGame.GameSessionYetToStartState, this.maxGameSessionLifetime) {
 
-     case Event(gameStarted: HuddleGame.EvInitiated, _) =>
+     case Event(gameInitiated: HuddleGame.EvInitiated, _) =>
 
           this.gameNeverStartedIndicator.cancel
-          sender ! recordStartOfTheGame(gameStarted.startedAt, gameStarted.gameSession)
-          goto (HuddleGame.GameSessionIsBeingPreparedState) using DataToCleanUpRedis(gameStarted.gameSession)
+          sender ! recordInitiationOfTheGame(gameInitiated.startedAt, gameInitiated.gameSession)
+          goto (HuddleGame.GameSessionIsBeingPreparedState) using DataToCleanUpRedis(gameInitiated.gameSession)
 
      case Event(HuddleGame.EvGameShouldHaveStartedByNow, _ ) =>
 
@@ -54,11 +54,11 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
 
    }
 
-   when (HuddleGame.GameSessionIsBeingPreparedState, this.maxGameTimeOut) {
+   when (HuddleGame.GameSessionIsBeingPreparedState, this.maxGameSessionLifetime) {
 
      case Event(setOfQuestions: EvQuizIsFinalized, _)   =>
 
-       sender ! recordQuizSet(setOfQuestions.finalizedAt, setOfQuestions.questionMetadata, setOfQuestions.gameSession)
+       sender ! recordPreparationOfTheGame(setOfQuestions.finalizedAt, setOfQuestions.questionMetadata, setOfQuestions.gameSession)
        goto (HuddleGame.GameSessionHasStartedState)
 
      case Event(StateTimeout, sessionReqdForCleaningUp:DataToCleanUpRedis)  =>
@@ -68,7 +68,7 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
        goto (HuddleGame.GameSessionIsWrappingUpState)
    }
 
-   when (HuddleGame.GameSessionHasStartedState, this.maxGameTimeOut) {
+   when (HuddleGame.GameSessionHasStartedState, this.maxGameSessionLifetime) {
 
      case Event(questionAnswered: HuddleGame.EvQuestionAnswered, _) =>
 
@@ -101,7 +101,7 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
 
    }
 
-   when (HuddleGame.GameSessionIsContinuingState, this.maxGameTimeOut)  {
+   when (HuddleGame.GameSessionIsContinuingState, this.maxGameSessionLifetime)  {
 
      case Event(questionAnswered: HuddleGame.EvQuestionAnswered, _) =>
        sender ! recordThatAQuestionIsAnswered(
@@ -134,7 +134,7 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
 
    }
 
-   when (HuddleGame.GameSessionIsPausedState, this.maxGameTimeOut)  {
+   when (HuddleGame.GameSessionIsPausedState, this.maxGameSessionLifetime)  {
 
       case Event(questionAnswered: HuddleGame.EvQuestionAnswered, _) =>
         sender ! recordThatAQuestionIsAnswered(
@@ -213,22 +213,24 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
   def gameSessionAlreadyExists (gameSession: GameSession): Boolean = this.redisClient.exists(gameSession)
 
   private def
-  recordQuizSet (atServerClockTime: Long, questionMetadata: String, gameSession: GameSession): RecordingStatus = {
+  recordPreparationOfTheGame (atServerClockTime: Long, questionMetadata: String, gameSession: GameSession): RecordingStatus = {
 
     RecordingStatus (
       storeSessionHistory(gameSession,GamePreparedTupleInREDIS(atServerClockTime,questionMetadata)) match {
 
         case f: FailedRedisSessionStatus =>
-          s"Failure: ${f.reason}, sessionID($gameSession), Metadata:(${questionMetadata}"
+          log.debug(s"Failure: (${f.reason}), Op: recordPreparation, sessionID($gameSession), Metadata:(${questionMetadata})")
+          ("Not Prepared")
         case OKRedisSessionStatus        =>
-          s"sessionID($gameSession), Quiz set up (${questionMetadata})."
+          log.debug(s"Success, Op: recordPreparation, sessionID($gameSession), Quiz set up (${questionMetadata})")
+          ("Prepared")
       }
     )
   }
 
 
   private
-  def recordStartOfTheGame(atServerClockTime: Long, gameSession: GameSession): RecordingStatus = {
+  def recordInitiationOfTheGame(atServerClockTime: Long, gameSession: GameSession): RecordingStatus = {
 
     // TODO: Handle this during transition from YetToStart to Started
     // val createdTuple = write[GameCreatedTuple](GameCreatedTuple("Game Sentinel"))
@@ -241,8 +243,12 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
     RecordingStatus (
           storeSessionHistory(gameSession,GameInitiatedTupleInREDIS(atServerClockTime)) match {
 
-            case f: FailedRedisSessionStatus => s"Failure: ${f.reason}"
-            case OKRedisSessionStatus        => s"sessionID($gameSession), Created."
+            case f: FailedRedisSessionStatus =>
+              log.debug(s"Failure: (${f.reason}), Op: recordInitiation, sessionID($gameSession)")
+              ("Not Initiated")
+            case OKRedisSessionStatus        =>
+              log.debug(s"Success, Op: recordInitiation, sessionID($gameSession)")
+              ("Initiated")
           })
 
   }
@@ -253,8 +259,12 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
     RecordingStatus (
       storeSessionHistory(gameSession,GameClipRunInREDIS(atServerClockTime,clipName)) match {
 
-        case f: FailedRedisSessionStatus => s"Failure: ${f.reason}, sessionID($gameSession), clip(${clipName}"
-        case OKRedisSessionStatus        => s"sessionID($gameSession), ClipPlayed(name:${{clipName}})."
+        case f: FailedRedisSessionStatus =>
+          log.debug(s"Failure: ${f.reason}, op: recordClipPlayed, sessionID($gameSession), clip(${clipName}")
+          ("Not Clip Played")
+        case OKRedisSessionStatus        =>
+          log.debug(s"Success, Op: recordClipPlayed, sessionID($gameSession)")
+          ("Clip Played")
       }
     )
   }
@@ -268,8 +278,12 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
     RecordingStatus (
       storeSessionHistory(gameSession,GamePlayedTupleInREDIS(atServerClockTime,questionNAnswer)) match {
 
-        case f: FailedRedisSessionStatus => s"Failure: ${f.reason}, sessionID($gameSession), question(${questionNAnswer.questionID},${questionNAnswer.answerID}"
-        case OKRedisSessionStatus        => s"sessionID($gameSession), Played(Q:${questionNAnswer.questionID},A:${questionNAnswer.answerID})."
+        case f: FailedRedisSessionStatus =>
+          log.debug(s"Failure: ${f.reason}, op: QuestionAnswered, sessionID($gameSession), question(${questionNAnswer.questionID},${questionNAnswer.answerID}")
+          ("Not QuestionAnswered")
+        case OKRedisSessionStatus        =>
+          log.debug(s"Sucess: op: QuestionAnswered, sessionID($gameSession), Played(Q:${questionNAnswer.questionID},A:${questionNAnswer.answerID})")
+          ("QuestionAnswered")
       }
     )
   }
@@ -280,8 +294,12 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
     RecordingStatus (
       storeSessionHistory(gameSession,GamePausedTupleInREDIS(atServerClockTime)) match {
 
-        case f: FailedRedisSessionStatus => s"Failure: ${f.reason}"
-        case OKRedisSessionStatus        => s"sessionID($gameSession), Paused."
+        case f: FailedRedisSessionStatus =>
+          log.debug(s"Failure: ${f.reason}, op: Paused, sessionID($gameSession)")
+          ("Not Paused")
+        case OKRedisSessionStatus        =>
+          log.debug(s"Success: op: Paused, sessionID($gameSession)")
+          ("Paused")
       }
     )
 
@@ -296,8 +314,12 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
     RecordingStatus (
       storeSessionHistory(gameSession,GameEndedTupleInREDIS(atServerClockTime, endedHow.toString,totalTimeTakenByPlayer )) match {
 
-        case f: FailedRedisSessionStatus => s"Failure: ${f.reason}"
-        case OKRedisSessionStatus        => s"sessionID($gameSession), Ended."
+        case f: FailedRedisSessionStatus =>
+          log.debug(s"Failure: ${f.reason}, op: Ended, sessionID($gameSession), how(${endedHow.toString})")
+          "Not Ended"
+        case OKRedisSessionStatus        =>
+          log.debug(s"Success, op: Ended, sessionID($gameSession), how(${endedHow.toString})")
+          "Ended"
       }
     )
   }
@@ -308,8 +330,12 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
     RecordingStatus(
       this.redisClient.del(gameSession) match {
 
-        case Some(n) => s"Game ($gameSession), ($n) key deleted."
-        case None    => s"Game ($gameSession), no such key found"
+        case Some(n) =>
+          log.debug(s"Success, op: Removal, Game ($gameSession), ($n) key removed")
+          "Removed"
+        case None    =>
+          log.debug(s"Failure, op: Removal, Game ($gameSession), no such key found")
+          "Not Removed"
       }
     )
   }
@@ -322,9 +348,12 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
     RecordingStatus(
       gamePlayRecord match {
 
-          case Some(s)  => s
-          case None     => s"NotFound: GamePlayRecord for ($gameSession)"
-
+          case Some(retrievedRec)  =>
+            log.debug(s"Success, op: Extraction, Game ($gameSession)")
+            retrievedRec
+          case None     =>
+            log.debug(s"Failure, op: Extraction, GamePlayRecord for ($gameSession) not found")
+            ("Not Found")
       }
     )
   }
@@ -336,13 +365,13 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
 
     if (historySoFar == NonExistingCompleteGamePlaySessionHistory) {
       log.info(s"Game Session:Key ($gameSession:SessionHistory) is not found.")
-      FailedRedisSessionStatus(s"Game Session:Key ($gameSession:SessionHistory) is not found.")
+      FailedRedisSessionStatus(s"($gameSession:SessionHistory) not found.")
     }
     else {
       val updatedHistory = historySoFar.elems :+ latestRecord
       val completeSessionSoFar = write[CompleteGamePlaySessionHistory](CompleteGamePlaySessionHistory(updatedHistory))
       this.redisClient.hset(gameSession, "SessionHistory", completeSessionSoFar)
-      log.info(s"Game Session:Key ($gameSession:SessionHistory) updated with ($latestRecord)")
+      log.debug(s"($gameSession:SessionHistory) updated with ($latestRecord)")
       OKRedisSessionStatus
     }
   }

@@ -33,7 +33,7 @@ object GameSessionRecordingServer {
   implicit val underlyingActorSystem = ActorSystem("GameSessionRecording")
   implicit val materializer = ActorMaterializer()
   implicit val executionContext = underlyingActorSystem.dispatcher
-  implicit val askTimeOutDuration:Timeout = Duration(3, "seconds")
+
 
   val config = ConfigFactory.load()
 
@@ -48,6 +48,9 @@ object GameSessionRecordingServer {
   val sessionHandlingSPOC =
     underlyingActorSystem
     .actorOf(GameSessionSPOCActor(gameSessionCompletionEmitter), "GameSessionSPOC")
+
+  implicit val askTimeOutDuration:Timeout =
+    Duration( config.getConfig("GameSession.externalServices"), "seconds")
 
   def main(args: Array[String]) {
 
@@ -132,7 +135,7 @@ object GameSessionRecordingServer {
             complete {
               println(s"req: $reqStartAGameWith")
               println("SPOC: " + sessionHandlingSPOC.path)
-              (sessionHandlingSPOC ? reqStartAGameWith).mapTo[RecordingStatus]
+              (sessionHandlingSPOC ? reqStartAGameWith).mapTo[RESPGameSessionBody]
 
             }
           }
