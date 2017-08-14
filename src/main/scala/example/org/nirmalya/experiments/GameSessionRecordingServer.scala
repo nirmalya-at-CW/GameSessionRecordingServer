@@ -63,7 +63,7 @@ object GameSessionRecordingServer {
 
     val route: Route = {
       logRequestResult("GameSessionRecorderService") {
-        startRoute ~ prepareRoute ~ playRoute ~ endedByManagerRoute ~ endRoute
+        startRoute ~ prepareRoute ~ playRoute ~ endByManagerRoute ~ endRoute
       }
     }
 
@@ -164,7 +164,7 @@ object GameSessionRecordingServer {
           complete {
             println(s"req: $reqSetQuizForGameWith")
             println("SPOC: " + sessionHandlingSPOC.path)
-            (sessionHandlingSPOC ? reqSetQuizForGameWith).mapTo[RecordingStatus]
+            (sessionHandlingSPOC ? reqSetQuizForGameWith).mapTo[RESPGameSessionBody]
 
           }
         }
@@ -185,7 +185,7 @@ object GameSessionRecordingServer {
             complete {
               println(s"req: $reqPlayAGameWith")
               println("SPOC: " + sessionHandlingSPOC.path)
-              (sessionHandlingSPOC ? reqPlayAGameWith).mapTo[RecordingStatus]
+              (sessionHandlingSPOC ? reqPlayAGameWith).mapTo[RESPGameSessionBody]
             }
           }
         }
@@ -205,7 +205,7 @@ object GameSessionRecordingServer {
             complete {
               println(s"req: $reqPlayAClipWith")
               println("SPOC: " + sessionHandlingSPOC.path)
-              (sessionHandlingSPOC ? reqPlayAClipWith).mapTo[RecordingStatus]
+              (sessionHandlingSPOC ? reqPlayAClipWith).mapTo[RESPGameSessionBody]
             }
           }
         }
@@ -224,14 +224,14 @@ object GameSessionRecordingServer {
           entity(as[REQPauseAGameWith]) { reqPauseAGameWith =>
             complete {
               println(s"req: $reqPauseAGameWith")
-              (sessionHandlingSPOC ? reqPauseAGameWith).mapTo[RecordingStatus]
+              (sessionHandlingSPOC ? reqPauseAGameWith).mapTo[RESPGameSessionBody]
             }
           }
         }
     }
   }
 
-  def endedByManagerRoute(implicit mat: Materializer) = {
+  def endByManagerRoute(implicit mat: Materializer) = {
     import akka.http.scaladsl.server.Directives._
     import Json4sSupport._
 
@@ -239,11 +239,11 @@ object GameSessionRecordingServer {
     implicit val formats       = DefaultFormats
 
     post {
-      pathPrefix("endedByManager") {
+      pathPrefix("endByManager") {
         entity(as[REQEndAGameByManagerWith]) { reqEndedByManagerWith =>
           complete {
             println(s"req: $reqEndedByManagerWith")
-            (sessionHandlingSPOC ? reqEndedByManagerWith).mapTo[RecordingStatus]
+            (sessionHandlingSPOC ? reqEndedByManagerWith).mapTo[RESPGameSessionBody]
           }
         }
       }
@@ -262,7 +262,7 @@ object GameSessionRecordingServer {
           entity(as[REQEndAGameWith]) { reqEndAGameWith =>
             complete {
               println(s"req: $reqEndAGameWith")
-              (sessionHandlingSPOC ? reqEndAGameWith).mapTo[RecordingStatus]
+              (sessionHandlingSPOC ? reqEndAGameWith).mapTo[RESPGameSessionBody]
             }
           }
         }

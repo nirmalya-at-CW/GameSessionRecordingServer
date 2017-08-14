@@ -72,9 +72,11 @@ Keys are important, values are just examples.
 
 ##  Request to start a game (endpoint:  /start)
     {
+        "companyID":"1"
         "company":"ABC",
         "manager":"Vikas",
         "playerID":"Nirmalya",
+        "gameID":"2",
         "gameName":"1Hudd",
         "gameUUID":"A123"
     }
@@ -82,27 +84,75 @@ Keys are important, values are just examples.
 ##  Response to start a game
     
     {
-       "details":"sessionID(ABC.Vikas.playerID.1Hudd.A123), Started."
+       "opSuccess":true,
+       "message":{
+          "successId":2100,
+          "description":"Initiated"
+       },
+       "contents":{
+          "dataCarried":{
+             "gameSessionID":"1.ABC.Vikas.Nirmalya.1.1Hudd.A123"
+          }
+       }
     }
     
     It is perhaps obvious how the **SessionID** is formed. We are simply 'dot-separating' the fields that are supplied with
-    '/start' request. Ensuring uniqueness is the responsibility of the caller. Even if all the other fields are the same,
+    '/start' request. Ensuring uniqueness is the **responsibility of the caller**. Even if all the other fields are the same,
     'gameUUID' is guaranteed to be unique. 
-
-##  Request to start a game (endpoint:  /play)
+##  Request to prepare a game (endpoint:  /prepare)
     {
        "sessionID":"ABC.Vikas.playerID.1Hudd.A123",
-       "questionID":1,
-       "answerID":2,
+       "questionMetadata":"some metadata, to be used by downstream processors"
+    }
+
+##  Response to play a game
+
+   {
+      "opSuccess":true,
+      "message":{
+         "successId":2200,
+         "description":"Prepared"
+      }
+   }
+    
+    
+Note: At this point, the GameSession has started, so that can one can play (below).
+
+##  Request to play a game (endpoint:  /play)
+    {
+       "sessionID":"ABC.Vikas.playerID.1Hudd.A123",
+       "questionID":"1",
+       "answerID":"2",
        "isCorrect":true,
-       "score":200
+       "points":200
+       "timeSpentToAnswerAtFE": 2
     }
 
 ##  Response to play a game
 
     {
-       details":"sessionID(ABC.Vikas.playerID.1Hudd.A123), Played Q(1)-A(2)."
+       "opSuccess":true,
+       "message":{
+          "successId":2200,
+          "description":"QuestionAnswered"
+       }
     }
+    
+##  Request to play an audio/video clip during a game (endpoint:  /playClip)
+    {
+       "sessionID":"ABC.Vikas.playerID.1Hudd.A123",
+       "clipName":"kishorekumar.mp3"
+    }
+
+##  Response to play an audio/video clip during a game 
+
+    {
+       "opSuccess":true,
+       "message":{
+          "successId":2200,
+          "description":"QuestionAnswered"
+       }
+    }    
     
 ##  Request to pause a game (endpoint: /pause)
     
@@ -113,22 +163,31 @@ Keys are important, values are just examples.
 ##  Response to pause a game
 
     {
-        "details":"sessionID(ABC.Vikas.playerID.1Hudd.A123), Paused."
+           "opSuccess":true,
+           "message":{
+              "successId":2200,
+              "description":"Paused"
+           }
     }
     
 ##  Request to end a game (endpoint: /end)
      
     {
-        "sessionID":"ABC.Vikas.playerID.1Hudd.A123"
+        "sessionID":"ABC.Vikas.playerID.1Hudd.A123",
+        "totalTimeTakenByPlayerAtFE":23
     }
     
 ## Response to end a game
     
     {
-        "details":"sessionID(ABC.Vikas.playerID.1Hudd.A123), Ended."
+       "opSuccess":true,
+       "message":{
+          "successId":2200,
+          "description":"Ended"
+       }
     }
 
-##  Request to end a game by the Manager (endpoint: /end)
+##  Request to end a game by the Manager (endpoint: /endByManager)
      
     {
         "sessionID":"ABC.Vikas.playerID.1Hudd.A123",
@@ -139,8 +198,12 @@ Keys are important, values are just examples.
 ## Response to end a game by the Manager
     
     {
-        "details":"sessionID(ABC.Vikas.playerID.1Hudd.A123), Ended."
-    }    
+       "opSuccess":true,
+       "message":{
+          "successId":2200,
+          "description":"Ended"
+       }
+    }
 
 
 # _curl_ command examples
