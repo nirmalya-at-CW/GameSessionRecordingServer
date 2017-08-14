@@ -63,6 +63,8 @@ If it is not, then a warning message must be logged and a message must
 be sent to the Admin Actor (TBD).
 *   _GameSessionCompletionEmitterActor_ must call the HTTP Endpoints using
 JSON. At the moment, it is passing Text.
+*   Error codes emitted by GameSessionRecorderActor should be properly folded inside
+responses that callers of the Service expects (refer to [confluence page](https://codewalla.atlassian.net/wiki/spaces/1NFL/pages/17727490/GameSessionRecordingService+Requests+and+Responses) ).
 
 ##   Example JSON messages for posting to GameSessionHandlingService
 
@@ -125,6 +127,20 @@ Keys are important, values are just examples.
     {
         "details":"sessionID(ABC.Vikas.playerID.1Hudd.A123), Ended."
     }
+
+##  Request to end a game by the Manager (endpoint: /end)
+     
+    {
+        "sessionID":"ABC.Vikas.playerID.1Hudd.A123",
+        "managerName":"Vikas"
+    }
+        
+    
+## Response to end a game by the Manager
+    
+    {
+        "details":"sessionID(ABC.Vikas.playerID.1Hudd.A123), Ended."
+    }    
 
 
 # _curl_ command examples

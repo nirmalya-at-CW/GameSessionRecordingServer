@@ -8,14 +8,10 @@ import akka.actor.{ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
 import org.scalatest.{BeforeAndAfterAll, MustMatchers, WordSpecLike}
-
-
 import example.org.nirmalya.experiments.GamePlayRecorderActor
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.{GameSession, HuddleGame, QuestionAnswerTuple}
+import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.{GameSession, GameSessionEndedByManager, HuddleGame, QuestionAnswerTuple}
 import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.HuddleGame._
 import org.nirmalya.experiment.common.StopSystemAfterAll
-
-
 
 import scala.language.postfixOps
 import scala.concurrent.duration.{Duration, _}
@@ -45,7 +41,7 @@ class GamePlayRecorderActorStateCorrectnessTest extends TestKit(ActorSystem("Hud
     TimeUnit.SECONDS
   )
 
-  val gameSession = GameSession("HuddleGame-Test-FSM", "Player-01")
+  val gameSession = GameSession("HuddleGame-Test-FSM")
   val gameStartsAt = System.currentTimeMillis()
 
   val questionaAndAnswers = IndexedSeq(
@@ -373,6 +369,41 @@ class GamePlayRecorderActorStateCorrectnessTest extends TestKit(ActorSystem("Hud
         Transition(gamePlayRecorderActor, GameSessionHasStartedState, GameSessionIsPausedState),
         Transition(gamePlayRecorderActor, GameSessionIsPausedState, GameSessionIsContinuingState),
         Transition(gamePlayRecorderActor, GameSessionIsContinuingState, GameSessionIsWrappingUpState)
+      )
+    }
+
+    "End the game forcefully, when the Manager wants it to" in {
+
+      val dummyProbe = TestProbe()
+
+      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor(
+        true,
+        gameSession,
+        redisHost,
+        redisPort,
+        maxGameTimeOut,
+        dummyProbe.ref
+      ), "RecorderActorForTest-10")
+
+      val testProbe = TestProbe()
+      gamePlayRecorderActor ! SubscribeTransitionCallBack(testProbe.ref)
+      testProbe.expectMsgPF(1 second) {
+        case CurrentState(_, GameSessionYetToStartState) => true
+      }
+
+      gamePlayRecorderActor ! HuddleGame.EvInitiated(gameStartsAt, gameSession)
+      gamePlayRecorderActor ! HuddleGame.EvQuizIsFinalized(gameStartsAt + 2, List(1,4,5,9).mkString("|"), gameSession)
+      gamePlayRecorderActor ! HuddleGame.EvPaused(gameStartsAt + 4, gameSession)
+      gamePlayRecorderActor ! HuddleGame.EvQuestionAnswered(gameStartsAt + 6, questionaAndAnswers(3), gameSession)
+      gamePlayRecorderActor ! HuddleGame.EvForceEndedByManager(gameStartsAt + 8, GameSessionEndedByManager, "Vikas",gameSession)
+
+      testProbe.expectMsgAllOf(
+        25 seconds, // Assuming the timeout duration for a game is 20 seconds!
+        Transition(gamePlayRecorderActor, GameSessionYetToStartState,       GameSessionIsBeingPreparedState),
+        Transition(gamePlayRecorderActor, GameSessionIsBeingPreparedState,  GameSessionHasStartedState),
+        Transition(gamePlayRecorderActor, GameSessionHasStartedState,       GameSessionIsPausedState),
+        Transition(gamePlayRecorderActor, GameSessionIsPausedState,         GameSessionIsContinuingState),
+        Transition(gamePlayRecorderActor, GameSessionIsContinuingState,     GameSessionIsWrappingUpState)
       )
     }
 

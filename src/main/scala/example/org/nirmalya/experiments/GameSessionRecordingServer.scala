@@ -63,7 +63,7 @@ object GameSessionRecordingServer {
 
     val route: Route = {
       logRequestResult("GameSessionRecorderService") {
-        startRoute ~ prepareRoute ~ playRoute ~ pauseRoute ~ endRoute
+        startRoute ~ prepareRoute ~ playRoute ~ endedByManagerRoute ~ endRoute
       }
     }
 
@@ -88,6 +88,9 @@ object GameSessionRecordingServer {
       println("GamesSessionRecordingServer cannot start! Connectivity to a REDIS instance is mandatory.")
 
       System.exit(-1)
+    }
+    else {
+      println(s"A Redis instance found at $redisHost:$redisPort, and connected to.")
     }
 
     Http().bindAndHandle(route, serviceHost, servicePort).map(f => {
@@ -225,6 +228,25 @@ object GameSessionRecordingServer {
             }
           }
         }
+    }
+  }
+
+  def endedByManagerRoute(implicit mat: Materializer) = {
+    import akka.http.scaladsl.server.Directives._
+    import Json4sSupport._
+
+    implicit val serialization = native.Serialization
+    implicit val formats       = DefaultFormats
+
+    post {
+      pathPrefix("endedByManager") {
+        entity(as[REQEndAGameByManagerWith]) { reqEndedByManagerWith =>
+          complete {
+            println(s"req: $reqEndedByManagerWith")
+            (sessionHandlingSPOC ? reqEndedByManagerWith).mapTo[RecordingStatus]
+          }
+        }
+      }
     }
   }
 

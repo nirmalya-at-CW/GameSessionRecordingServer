@@ -9,7 +9,6 @@ import org.json4s.native.JsonMethods._
 import org.json4s.native.Serialization.{read, write}
 
 import scala.concurrent.duration.{Duration, FiniteDuration, TimeUnit}
-
 import scala.concurrent.ExecutionContext.Implicits.global
 
 
@@ -185,12 +184,31 @@ class GamePlayRecorderActor(val cleanDataOnExit: Boolean,
 
         case EvGamePlayRecordSoFarRequired(gameSession) =>
              sender ! extractCurrentGamePlayRecord(gameSession)
+          stay
+
+        case EvForceEndedByManager(t,e,n,g) =>
+
+          val hasEndedSuccessfully = recordEndOfTheGame(t, GameSessionEndedByManager, -1, g)
+
+          if (hasEndedSuccessfully.details == "Ended") {
+            log.info(s"GameSession ($g), forced to end by manager ($n), at ($t)")
+            sender ! hasEndedSuccessfully
+            self ! EvCleanUpRequired(g)
+            goto (GameSessionIsWrappingUpState)
+          }
+          else {
+            log.info(s"GameSession ($g), failed to end by manager ($n), at ($t)")
+            sender ! hasEndedSuccessfully
+            stay
+          }
+
 
         case _  =>
           log.info(s"Unknown message of type ${m.getClass}, in ${this.stateName}")
+          stay
       }
 
-      stay
+
   }
 
   onTransition {

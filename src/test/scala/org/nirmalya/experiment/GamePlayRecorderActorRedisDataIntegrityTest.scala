@@ -73,7 +73,7 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
 
       val probe1 = TestProbe()
 
-      val gameSession = GameSession(keyPrefix + actorName, "Player-01")
+      val gameSession = GameSession(keyPrefix + actorName)
 
       val gamePlayRecorderActor = system.actorOf(
         GamePlayRecorderActor(
@@ -114,7 +114,7 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
 
       val probe1 = TestProbe()
 
-      val gameSession = GameSession(keyPrefix + actorName, "Player-01")
+      val gameSession = GameSession(keyPrefix + actorName)
 
       val gamePlayRecorderActor = system.actorOf(
         GamePlayRecorderActor(
@@ -201,7 +201,7 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
 
       val probe1 = TestProbe()
 
-      val gameSession = GameSession(keyPrefix + "-" + actorName, "Player-01")
+      val gameSession = GameSession(keyPrefix + "-" + actorName)
 
       val gamePlayRecorderActor = system.actorOf(
         GamePlayRecorderActor(
@@ -280,7 +280,7 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
 
       val probe1 = TestProbe()
 
-      val gameSession = GameSession(keyPrefix + "-" + actorName, "Player-01")
+      val gameSession = GameSession(keyPrefix + "-" + actorName)
 
       val gamePlayRecorderActor = system.actorOf(
         GamePlayRecorderActor(
@@ -354,6 +354,96 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
 
           val anEndedTuple = completeHistory.elems.toIndexedSeq(5).asInstanceOf[GameEndedTupleInREDIS]
           anEndedTuple.gameEndingReason should be(GameSessionEndedByTimeOut.toString)
+
+        case None => 0 shouldEqual (1) // Here, we want to know if there is a failure!
+
+      }
+
+    }
+
+    "end the game, if the Manager wants it to" in {
+
+      val actorName =  "RecorderActorForTest-6"
+
+      val probe1 = TestProbe()
+
+      val gameSession = GameSession(keyPrefix + "-" + actorName)
+
+      val gamePlayRecorderActor = system.actorOf(
+        GamePlayRecorderActor(
+          true,
+          gameSession,
+          redisHost,
+          redisPort,
+          FiniteDuration(6,TimeUnit.SECONDS), // Overriding the maxGameTimeOut value here, because we want the testcase to finish fast
+          probe1.ref
+        ),actorName
+      )
+
+      gamePlayRecorderActor ! HuddleGame.EvInitiated(gameStartsAt, gameSession)
+      expectMsg(RecordingStatus("Initiated"))
+
+      gamePlayRecorderActor ! HuddleGame.EvQuizIsFinalized(gameStartsAt+1,List(1,2,3,4).mkString("|"),gameSession)
+      expectMsg(RecordingStatus("Prepared"))
+
+
+      gamePlayRecorderActor ! HuddleGame.EvQuestionAnswered(gameStartsAt+2,questionaAndAnswers(0),gameSession)
+      expectMsg(RecordingStatus("QuestionAnswered"))
+
+      gamePlayRecorderActor ! HuddleGame.EvPaused(gameStartsAt+3,gameSession)
+      expectMsg(RecordingStatus("Paused"))
+
+      gamePlayRecorderActor ! HuddleGame.EvForceEndedByManager(gameStartsAt+4,GameSessionEndedByManager,"Vikas",gameSession)
+      expectMsg(RecordingStatus("Ended"))
+
+      awaitCond(
+        {
+          // 'SessionHistory' below, is hardcoded as the 'V', in (K,V) as stored in REDIS hash.
+          val history = redisClient.hget(gameSession, "SessionHistory")
+
+          history match {
+            case Some(v) =>
+              val completeHistory = read[CompleteGamePlaySessionHistory](v)
+              completeHistory.elems.length == 6 // Created+Initiated+Prepared+Played+Paused+Ended
+            case None =>
+              false
+          }
+        },
+        redisUpdateIndicatorAwaitingTime,
+        10 seconds, // We are waiting for 10 seconds, because maxGameTimeOut has been initialized as 6 Seconds, in this case
+        "REDIS"
+      )
+
+      val history = redisClient.hget(gameSession, "SessionHistory")
+
+      history match {
+        case Some(v) =>
+          val completeHistory = read[CompleteGamePlaySessionHistory](v)
+          completeHistory.elems.length should be(6)
+          completeHistory.elems.toIndexedSeq(0) shouldBe a[GameCreatedTupleInREDIS]
+          completeHistory.elems.toIndexedSeq(1) shouldBe a[GameInitiatedTupleInREDIS]
+          completeHistory.elems.toIndexedSeq(2) shouldBe a[GamePreparedTupleInREDIS]
+          completeHistory.elems.toIndexedSeq(3) shouldBe a[GamePlayedTupleInREDIS]
+          completeHistory.elems.toIndexedSeq(4) shouldBe a[GamePausedTupleInREDIS]
+          completeHistory.elems.toIndexedSeq(5) shouldBe a[GameEndedTupleInREDIS]
+
+          val aCreatedTuple = completeHistory.elems.toIndexedSeq(0).asInstanceOf[GameCreatedTupleInREDIS]
+          aCreatedTuple.flag should be("Game Sentinel")
+
+          val aStartedTuple = completeHistory.elems.toIndexedSeq(1).asInstanceOf[GameInitiatedTupleInREDIS]
+          aStartedTuple.t shouldEqual (gameStartsAt)
+
+          val aInitiatedTuple = completeHistory.elems.toIndexedSeq(2).asInstanceOf[GamePreparedTupleInREDIS]
+          aInitiatedTuple.t shouldEqual (gameStartsAt + 1)
+
+          val aPlayTuple1 = completeHistory.elems.toIndexedSeq(3).asInstanceOf[GamePlayedTupleInREDIS]
+          aPlayTuple1.questionAnswer shouldEqual (questionaAndAnswers(0))
+
+          val aPlayPausedTuple = completeHistory.elems.toIndexedSeq(4).asInstanceOf[GamePausedTupleInREDIS]
+          aPlayPausedTuple.t shouldEqual (gameStartsAt + 3)
+
+          val anEndedTuple = completeHistory.elems.toIndexedSeq(5).asInstanceOf[GameEndedTupleInREDIS]
+          anEndedTuple.gameEndingReason should be(GameSessionEndedByManager.toString)
 
         case None => 0 shouldEqual (1) // Here, we want to know if there is a failure!
 

@@ -21,8 +21,8 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
   with ImplicitSender
   with StopSystemAfterAll {
 
-  val inCorrectGameSession = GameSession("HuddleGame-Test-SPOC-NonExistent", "Player-01")
-  val (company,manager,player,gamename,uuid) = ("Codewalla","Boss","minion","tic-tac-toe","A123")
+  val inCorrectGameSession = GameSession("HuddleGame-Test-SPOC-NonExistent")
+  //val (company,manager,player,gamename,uuid) = ("Codewalla","Boss","minion","tic-tac-toe","A123")
   val gameStartsAt = System.currentTimeMillis()
 
   val questionaAndAnswers = IndexedSeq(

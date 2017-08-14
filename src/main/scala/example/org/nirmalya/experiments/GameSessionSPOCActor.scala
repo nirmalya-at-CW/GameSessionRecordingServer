@@ -6,7 +6,7 @@ import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
 import akka.pattern._
 import akka.util.Timeout
 import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.ExternalAPIParams.{ExpandedMessage, RESPGameSessionBody, Supplementary}
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.{ExternalAPIParams, GameSession, GameSessionEndedByPlayer, HuddleGame, QuestionAnswerTuple, RecordingStatus}
+import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.{ExternalAPIParams, GameSession, GameSessionEndedByManager, GameSessionEndedByPlayer, HuddleGame, QuestionAnswerTuple, RecordingStatus}
 
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.util.{Failure, Success}
@@ -44,7 +44,7 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
   def receive = {
 
     case r: ExternalAPIParams.REQStartAGameWith =>
-      val gameSession = GameSession(r.toString, "Ignore")
+      val gameSession = GameSession(r.toString)
 
       if (activeGameSessionActors.isDefinedAt(r.toString))
         sender ! RESPGameSessionBody(
@@ -83,7 +83,7 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
 
     case r: ExternalAPIParams.REQSetQuizForGameWith =>
 
-      val gameSession = GameSession(r.sessionID, "Ignore")
+      val gameSession = GameSession(r.sessionID)
 
       val originalSender = sender()
       activeGameSessionActors.get(r.sessionID) match {
@@ -118,7 +118,7 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
 
     case r: ExternalAPIParams.REQPlayAGameWith =>
 
-      val gameSession = GameSession(r.sessionID, "Ignore")
+      val gameSession = GameSession(r.sessionID)
 
       val originalSender = sender()
       activeGameSessionActors.get(r.sessionID) match {
@@ -159,7 +159,7 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
 
     case r: ExternalAPIParams.REQPlayAClipWith =>
 
-      val gameSession = GameSession(r.sessionID, "Ignore")
+      val gameSession = GameSession(r.sessionID)
 
       val originalSender = sender()
       activeGameSessionActors.get(r.sessionID) match {
@@ -193,7 +193,7 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
       }
 
     case r: ExternalAPIParams.REQPauseAGameWith =>
-      val gameSession = GameSession(r.sessionID, "Ignore")
+      val gameSession = GameSession(r.sessionID)
 
       val originalSender = sender()
       activeGameSessionActors.get(r.sessionID) match {
@@ -222,7 +222,7 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
 
     case r: ExternalAPIParams.REQEndAGameWith =>
 
-      val gameSession = GameSession(r.sessionID, "Ignore")
+      val gameSession = GameSession(r.sessionID)
 
       val originalSender = sender()
       activeGameSessionActors.get(r.sessionID) match {
@@ -254,6 +254,41 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
           )
       }
 
+
+    case r: ExternalAPIParams.REQEndAGameByManagerWith =>
+
+      val gameSession = GameSession(r.sessionID)
+
+      val originalSender = sender()
+      activeGameSessionActors.get(r.sessionID) match {
+
+        case Some (sessionActor) =>
+
+          val confirmation = (sessionActor ? HuddleGame.EvForceEndedByManager(
+                                                           System.currentTimeMillis(),
+                                                           GameSessionEndedByManager,
+                                                           r.managerName,
+                                                           gameSession)
+                             ).mapTo[RecordingStatus]
+          confirmation.onComplete {
+            case Success(d) =>
+              originalSender ! RESPGameSessionBody(
+                true,
+                ExpandedMessage(2200, d.details)
+              )
+            case Failure(e) =>
+              originalSender ! RESPGameSessionBody(
+                false,
+                ExpandedMessage(1200, e.getMessage)
+              )
+          }
+        case None                =>
+          originalSender ! RESPGameSessionBody(
+            false,
+            ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists")
+          )
+
+      }
     // TODO: Revisit the following handler. What is the best way to remember the session that the this
     // TODO: this terminated actor has been seeded with?
     case Terminated(sessionActor) =>

@@ -33,6 +33,7 @@ object GameSessionHandlingServiceProtocol {
     case class REQPlayAClipWith(sessionID: String, clipName: String)
     case class REQPauseAGameWith(sessionID: String)
     case class REQEndAGameWith(sessionID: String, totalTimeTakenByPlayerAtFE: Int)
+    case class REQEndAGameByManagerWith(sessionID: String, managerName: String)
 
     case class ExpandedMessage (successId: Int, description: String)
     case class Supplementary(dataCarried: Map[String,String])
@@ -49,7 +50,7 @@ object GameSessionHandlingServiceProtocol {
   case class GameChosen(company: String, manager: String, playerID: String, gameName: String)
   case class QuestionAnswerTuple(questionID: Int, answerID: Int, isCorrect: Boolean, points: Int, timeTakenToAnswerAtFE: Int)
 
-  case class GameSession(sessionID: String, playerID: String) {
+  case class GameSession(sessionID: String) {
     override def toString = sessionID
   }
 
@@ -100,6 +101,7 @@ object GameSessionHandlingServiceProtocol {
     case class EvQuestionAnswered(receivedAt: Long, questionAndAnswer:QuestionAnswerTuple, gameSession: GameSession) extends HuddleGameEvent
     case class EvPaused(pausedAt: Long, gameSession: GameSession) extends HuddleGameEvent
     case class EvEnded(endedAt: Long, endedBy: GameSessionEndingReason = GameSessionEndedByPlayer, totalTimeTakenByPlayer: Int, gameSession: GameSession) extends HuddleGameEvent
+    case class EvForceEndedByManager(endedAt: Long, endedBy: GameSessionEndingReason = GameSessionEndedByPlayer, managerName: String, gameSession: GameSession) extends HuddleGameEvent
     case class EvCleanUpRequired(gameSession: GameSession) extends HuddleGameEvent
     case class EvGamePlayRecordSoFarRequired(gameSession: GameSession) extends HuddleGameEvent
     case object EvGameShouldHaveStartedByNow extends HuddleGameEvent
