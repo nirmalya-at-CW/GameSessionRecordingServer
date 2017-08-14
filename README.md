@@ -209,13 +209,22 @@ Note: At this point, the GameSession has started, so that can one can play (belo
 # _curl_ command examples
 
 ### start
-curl -v -H "Content-Type: application/json" -X POST -d '{"company":"ABC","manager":"Vikas","playerID":"Nirmalya","gameName":"1Hudd","gameUUID":"A123"}' http://localhost:9090/start
+curl -v -H "Content-Type: application/json" -X POST -d '{"companyName":"ABC","companyID":1,"manager":"Vikas","playerID":"Nirmalya","gameName":"1Hudd","gameID":1,"gameSessionUUID":"A123"}' http://localhost:9090/start
+
+### prepare
+curl -v -H "Content-Type: application/json" -X POST -d '{"sessionID":"1.ABC.Vikas.Nirmalya.1.1Hudd.A123","questionMetadata":"some metadata"}' http://localhost:9090/prepare
 
 ### play
-curl -v -H "Content-Type: application/json" -X POST -d '{"sessionID":"ABC.Vikas.playerID.1Hudd.A123","questionID":1, "answerID": 2, "isCorrect":true, "score":200}' http://localhost:9090/play
+curl -v -H "Content-Type: application/json" -X POST -d '{"sessionID":"1.ABC.Vikas.Nirmalya.1.1Hudd.A123","questionID":"1", "answerID":"2","isCorrect":true,"points":200,"timeSpentToAnswerAtFE": 2}' http://localhost:9090/play
 
 ### pause
-curl -v -H "Content-Type: application/json" -X POST -d '{"sessionID":"ABC.Vikas.playerID.1Hudd.A123"}' http://localhost:9090/pause
+curl -v -H "Content-Type: application/json" -X POST -d '{"sessionID":"1.ABC.Vikas.Nirmalya.1.1Hudd.A123","questionID":"1"}' http://localhost:9090/pause
+
+### playClip
+curl -v -H "Content-Type: application/json" -X POST -d '{"sessionID":"1.ABC.Vikas.Nirmalya.1.1Hudd.A123","clipName":"KishoreKumar.mp3"}' http://localhost:9090/playClip 
 
 ### end
-curl -v -H "Content-Type: application/json" -X POST -d '{"sessionID":"ABC.Vikas.playerID.1Hudd.A123"}' http://localhost:9090/end
+curl -v -H "Content-Type: application/json" -X POST -d '{"sessionID":"ABC.Vikas.playerID.1Hudd.A123","totalTimeTakenByPlayerAtFE":23}' http://localhost:9090/end
+
+### endByManager
+curl -v -H "Content-Type: application/json" -X POST -d '{"sessionID":"ABC.Vikas.playerID.1Hudd.A123","managerName":"Vikas"}' http://localhost:9090/endByManager
