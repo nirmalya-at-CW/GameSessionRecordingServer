@@ -8,7 +8,7 @@ import org.scalatest._
 import Matchers._
 import com.redis.RedisClient
 import org.json4s.native.Serialization.{read, write}
-import example.org.nirmalya.experiments.{GamePlayRecorderActor, GameSessionSPOCActor}
+import example.org.nirmalya.experiments.{GameSessionStateHolderActor$, GameSessionSPOCActor}
 import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.HuddleGame.{GameSessionHasStartedState, GameSessionIsContinuingState, GameSessionIsPausedState, GameSessionYetToStartState}
 import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol._
 import org.nirmalya.experiment.common.StopSystemAfterAll
@@ -76,7 +76,7 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
       val gameSession = GameSession(keyPrefix + actorName)
 
       val gamePlayRecorderActor = system.actorOf(
-        GamePlayRecorderActor(
+        GameSessionStateHolderActor(
           true,
           gameSession,
           redisHost,
@@ -117,7 +117,7 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
       val gameSession = GameSession(keyPrefix + actorName)
 
       val gamePlayRecorderActor = system.actorOf(
-        GamePlayRecorderActor(
+        GameSessionStateHolderActor(
             true,
             gameSession,
             redisHost,
@@ -204,7 +204,7 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
       val gameSession = GameSession(keyPrefix + "-" + actorName)
 
       val gamePlayRecorderActor = system.actorOf(
-        GamePlayRecorderActor(
+        GameSessionStateHolderActor(
               true,
               gameSession,
               redisHost,
@@ -283,7 +283,7 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
       val gameSession = GameSession(keyPrefix + "-" + actorName)
 
       val gamePlayRecorderActor = system.actorOf(
-        GamePlayRecorderActor(
+        GameSessionStateHolderActor(
           true,
           gameSession,
           redisHost,
@@ -370,7 +370,7 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
       val gameSession = GameSession(keyPrefix + "-" + actorName)
 
       val gamePlayRecorderActor = system.actorOf(
-        GamePlayRecorderActor(
+        GameSessionStateHolderActor(
           true,
           gameSession,
           redisHost,

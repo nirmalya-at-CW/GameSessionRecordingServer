@@ -1,17 +1,22 @@
 package example.org.nirmalya.experiments
 
 import akka.actor.ActorSystem
-import akka.event.Logging
+import akka.event.Logging.LogLevel
+import akka.event.{Logging, LoggingAdapter}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
-import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.model.{HttpEntity, HttpRequest}
+import akka.http.scaladsl.server.{Route, RouteResult}
+import akka.http.scaladsl.server.RouteResult.{Complete, Rejected}
+import akka.http.scaladsl.server.directives.{DebuggingDirectives, LogEntry, LoggingMagnet}
 import akka.stream.{ActorMaterializer, Materializer}
 import org.json4s.{DefaultFormats, Formats, ShortTypeHints, native}
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import akka.pattern._
+import akka.stream.scaladsl.Sink
 import akka.util.Timeout
 import com.redis.RedisClient
 import com.typesafe.config.ConfigFactory
@@ -57,17 +62,29 @@ object GameSessionRecordingServer {
         toInt,
       "seconds")
 
-  def main(args: Array[String]) {
+  def start(args: Array[String]) {
 
     val logger = Logging(underlyingActorSystem, getClass)
 
-    val route: Route = {
-      logRequestResult("GameSessionRecorderService") {
-        startRoute ~ prepareRoute ~ playRoute ~ endByManagerRoute ~ endRoute
-      }
+
+   /* // This one will only log rejections
+    val rejectionLogger: HttpRequest ⇒ RouteResult ⇒ Option[LogEntry] = req ⇒ {
+      case Rejected(rejections) ⇒ Some(LogEntry(s"Request: $req\nwas rejected with rejections:\n$rejections",
+        Logging.ErrorLevel))
+      case _                    ⇒ None
     }
+    DebuggingDirectives.logRequestResult(rejectionLogger)*/
 
 
+   /* def requestMethodAndResponseStatusAsInfo(req: HttpRequest): RouteResult => Option[LogEntry] = {
+      case RouteResult.Complete(res) => Some(LogEntry(req.method.name + ": " + res.status, Logging.InfoLevel))
+      case _                         => None // no log entries for rejections
+    }
+    DebuggingDirectives.logRequestResult(requestMethodAndResponseStatusAsInfo _)*/
+
+
+    val completeRoute = startRoute ~ prepareRoute ~ playRoute ~ endByManagerRoute ~ endRoute
+    val route: Route = logRequestResult(Logging.WarningLevel, completeRoute)
 
     val (serviceHost, servicePort) = (
 
@@ -267,5 +284,33 @@ object GameSessionRecordingServer {
           }
         }
     }
+  }
+
+  def entityAsString(entity: HttpEntity)
+                    (implicit m: Materializer, ex: ExecutionContext): Future[String] = {
+
+    entity.dataBytes
+      .map(_.decodeString(entity.contentType.value))
+      .runWith(Sink.head)
+  }
+
+  def logRequestResult(level: LogLevel, route: Route)
+                      (implicit m: Materializer, ex: ExecutionContext) = {
+    def myLoggingFunction(logger: LoggingAdapter)(req: HttpRequest)(res: Any): Unit = {
+      val entry = res match {
+        case Complete(resp) =>
+          println(s"** ${req.method} ${req.uri}: ${resp.status} **")
+          entityAsString(resp.entity).map(data ⇒ (s"${req.method} ${req.uri}: ${resp.status} \n entity: $data", level))
+        case Rejected(reason) =>
+          Future.successful(s"Request: ${req._4}, Rejected Reason: ${reason.head}", level)
+        case other =>
+          Future.successful((s"$other", level))
+      }
+      entry.map(x => println(x._1))
+    }
+
+    println(s"**  setting up debugging directive **")
+
+    DebuggingDirectives.logRequestResult(LoggingMagnet(log => myLoggingFunction(log)))(route)
   }
 }

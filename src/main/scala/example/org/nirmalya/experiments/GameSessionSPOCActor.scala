@@ -39,21 +39,19 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
     context.system.settings.config.getConfig("GameSession.maxGameSessionLifetime").getInt("duration"),
     TimeUnit.SECONDS)
 
-  var activeGameSessionActors: Map[String, ActorRef] = Map.empty
+  var activeGameSessionCustodians: Map[String, ActorRef] = Map.empty
 
   def receive = {
 
     case r: ExternalAPIParams.REQStartAGameWith =>
-      val gameSession = GameSession(r.toString)
+      val gameSession = GameSession(r.companyID,r.departmentID,r.gameID,r.playerID,r.gameName, r.gameSessionUUID)
 
-      if (activeGameSessionActors.isDefinedAt(r.toString))
-        sender ! RESPGameSessionBody(
-                    false,
-                    ExpandedMessage(1200, s"GameSession with $r is already active."))
+      if (activeGameSessionCustodians.isDefinedAt(r.gameSessionUUID))
+        sender ! RESPGameSessionBody(false, ExpandedMessage(1200, s"GameSession with $r is already active."))
       else {
         val originalSender = sender()
         val child = context.actorOf(
-          GamePlayRecorderActor(
+          GameSessionStateHolderActor(
             true,
             gameSession,
             redisHost,
@@ -61,59 +59,34 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
             maxGameSessionLifetime,
             gameSessionFinishEmitter
           ), gameSession.toString)
-        context.watch(child)
+        context.watch(child) // Because we want to restart failing actors
+                             // TODO: implement logic to restart!
 
-        this.activeGameSessionActors = this.activeGameSessionActors + Tuple2(r.toString,child)
+        this.activeGameSessionCustodians = this.activeGameSessionCustodians + Tuple2(r.gameSessionUUID,child)
 
-        val confirmation = (child ? HuddleGame.EvInitiated(System.currentTimeMillis(), gameSession)).mapTo[RecordingStatus]
-        confirmation.onComplete {
-          case Success(d) =>
-               originalSender ! RESPGameSessionBody(
-                                         true,
-                                         ExpandedMessage(2100, d.details),
-                                         Some(Map("gameSessionID" -> gameSession.toString))
-                                )
-          case Failure(e) =>
-               originalSender ! RESPGameSessionBody(
-                                         false,
-                                         ExpandedMessage(1200, e.getMessage)
-                                )
-        }
+        (child ? HuddleGame.EvInitiated(System.currentTimeMillis(), gameSession)).pipeTo(sender)
+
       }
 
     case r: ExternalAPIParams.REQSetQuizForGameWith =>
 
-      val gameSession = GameSession(r.sessionID)
-
       val originalSender = sender()
-      activeGameSessionActors.get(r.sessionID) match {
 
-        case Some (sessionActor) =>
+      originalSender ! (activeGameSessionCustodians.get(r.sessionID) match {
 
-          val confirmation =
-            (sessionActor ? HuddleGame.EvQuizIsFinalized(
-                                               System.currentTimeMillis(),
-                                               r.questionMetadata,
-                                               gameSession)
-            ).mapTo[RecordingStatus]
-          confirmation.onComplete {
-            case Success(d) =>
-              originalSender ! RESPGameSessionBody(
-                                    true,
-                                    ExpandedMessage(2200, d.details)
-                               )
-            case Failure(e) =>
-              originalSender ! RESPGameSessionBody(
-                                    false,
-                                    ExpandedMessage(1200, e.getMessage)
-                              )
-          }
-        case None                =>
-          originalSender ! RESPGameSessionBody(
-                                  false,
-                                  ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists")
-                           )
-      }
+                         case Some (sessionActor) => {
+                           val confirmation = (sessionActor ? HuddleGame.EvQuizIsFinalized(
+                                                                System.currentTimeMillis(),
+                                                                r.questionMetadata,
+                                                                gameSession)
+                                              ).mapTo[RecordingStatus]
+                           confirmation.onComplete {
+                             case Success(d) => RESPGameSessionBody(true,ExpandedMessage(2200, d.details))
+                             case Failure(e) => RESPGameSessionBody(false,ExpandedMessage(1200, e.getMessage))
+                           }
+                         }
+                         case None  => RESPGameSessionBody(false,ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists"))
+                       })
 
 
     case r: ExternalAPIParams.REQPlayAGameWith =>
@@ -121,179 +94,120 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
       val gameSession = GameSession(r.sessionID)
 
       val originalSender = sender()
-      activeGameSessionActors.get(r.sessionID) match {
 
-        case Some (sessionActor) =>
+      originalSender ! (activeGameSessionCustodians.get(r.sessionID) match {
 
-          val confirmation =
-            (sessionActor ? HuddleGame.EvQuestionAnswered(
-                                          System.currentTimeMillis(),
-                                          QuestionAnswerTuple(
-                                            r.questionID.toInt,
-                                            r.answerID.toInt,
-                                            r.isCorrect,
-                                            r.points,
-                                            r.timeSpentToAnswerAtFE
-                                          ),
-                                          gameSession
-                                       )
-            ).mapTo[RecordingStatus]
-          confirmation.onComplete {
-            case Success(d) =>
-              originalSender ! RESPGameSessionBody(
-                                      true,
-                                      ExpandedMessage(2200, d.details)
-                               )
-            case Failure(e) =>
-              originalSender ! RESPGameSessionBody(
-                                      false,
-                                      ExpandedMessage(1200, e.getMessage)
-                               )
-          }
-        case None                =>
-          originalSender ! RESPGameSessionBody(
-            false,
-            ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists")
-          )
-      }
+                          case Some (sessionActor) => {
+                                              val confirmation = (sessionActor ? HuddleGame.EvQuestionAnswered(
+                                                                                    System.currentTimeMillis(),
+                                                                                    QuestionAnswerTuple(
+                                                                                      r.questionID.toInt,
+                                                                                      r.answerID.toInt,
+                                                                                      r.isCorrect,
+                                                                                      r.points,
+                                                                                      r.timeSpentToAnswerAtFE
+                                                                                    ),
+                                                                                    gameSession
+                                                                                  )
+                                                ).mapTo[RecordingStatus]
+                                                confirmation.onComplete {
+                                                  case Success(d) => RESPGameSessionBody(true,ExpandedMessage(2200, d.details))
+                                                  case Failure(e) => RESPGameSessionBody(false,ExpandedMessage(1200, e.getMessage))
+                                                }
+                                              }
+                          case None  => RESPGameSessionBody(false,ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists"))
+                        })
+
 
     case r: ExternalAPIParams.REQPlayAClipWith =>
 
       val gameSession = GameSession(r.sessionID)
 
       val originalSender = sender()
-      activeGameSessionActors.get(r.sessionID) match {
+      originalSender ! (activeGameSessionCustodians.get(r.sessionID) match {
 
-        case Some (sessionActor) =>
-
-          val confirmation =
-            (sessionActor ? HuddleGame.EvPlayingClip(
-                                        System.currentTimeMillis(),
-                                         r.clipName,
-                                         gameSession
-                                       )
-            ).mapTo[RecordingStatus]
-          confirmation.onComplete {
-            case Success(d) =>
-              originalSender ! RESPGameSessionBody(
-                                  true,
-                                  ExpandedMessage(2200, d.details)
-                               )
-            case Failure(e) =>
-              originalSender ! RESPGameSessionBody(
-                                  false,
-                                  ExpandedMessage(1200, e.getMessage)
-                               )
-          }
-        case None                =>
-          originalSender ! RESPGameSessionBody(
-            false,
-            ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists")
-          )
-      }
+                          case Some (sessionActor) =>
+                            val confirmation =
+                              (sessionActor ? HuddleGame.EvPlayingClip(
+                                                          System.currentTimeMillis(),
+                                                           r.clipName,
+                                                           gameSession
+                                                         )
+                              ).mapTo[RecordingStatus]
+                            confirmation.onComplete {
+                              case Success(d) => RESPGameSessionBody(true,ExpandedMessage(2200, d.details))
+                              case Failure(e) => RESPGameSessionBody(false,ExpandedMessage(1200, e.getMessage))
+                            }
+                          case None => RESPGameSessionBody(false,ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists"))
+                        })
 
     case r: ExternalAPIParams.REQPauseAGameWith =>
       val gameSession = GameSession(r.sessionID)
 
       val originalSender = sender()
-      activeGameSessionActors.get(r.sessionID) match {
+
+      originalSender ! (activeGameSessionCustodians.get(r.sessionID) match {
 
         case Some (sessionActor) =>
-
-          val confirmation = (sessionActor ? HuddleGame.EvPaused(System.currentTimeMillis(), gameSession)).mapTo[RecordingStatus]
+          val confirmation =
+            (sessionActor ? HuddleGame.EvPaused(System.currentTimeMillis(), gameSession)).mapTo[RecordingStatus]
           confirmation.onComplete {
-            case Success(d) =>
-              originalSender ! RESPGameSessionBody(
-                                  true,
-                                  ExpandedMessage(2200, d.details)
-                               )
-            case Failure(e) =>
-              originalSender ! RESPGameSessionBody(
-                                    false,
-                                    ExpandedMessage(1200, e.getMessage)
-                               )
+            case Success(d) => RESPGameSessionBody(true,ExpandedMessage(2200, d.details))
+            case Failure(e) => RESPGameSessionBody(false,ExpandedMessage(1200, e.getMessage))
           }
-        case None                =>
-          originalSender ! RESPGameSessionBody(
-            false,
-            ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists")
-          )
-      }
+        case None => RESPGameSessionBody(false,ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists"))
+      })
+
 
     case r: ExternalAPIParams.REQEndAGameWith =>
 
       val gameSession = GameSession(r.sessionID)
 
       val originalSender = sender()
-      activeGameSessionActors.get(r.sessionID) match {
+
+      originalSender ! (activeGameSessionCustodians.get(r.sessionID) match {
 
         case Some (sessionActor) =>
-
           val confirmation = (sessionActor ? HuddleGame.EvEnded(
-                                                System.currentTimeMillis(),
-                                                GameSessionEndedByPlayer,
-                                                r.totalTimeTakenByPlayerAtFE,
-                                                gameSession)
-            ).mapTo[RecordingStatus]
+                                                          System.currentTimeMillis(),
+                                                          GameSessionEndedByPlayer,
+                                                          r.totalTimeTakenByPlayerAtFE,
+                                                          gameSession)
+                             ).mapTo[RecordingStatus]
           confirmation.onComplete {
-            case Success(d) =>
-              originalSender ! RESPGameSessionBody(
-                                    true,
-                                    ExpandedMessage(2200, d.details)
-                               )
-            case Failure(e) =>
-              originalSender ! RESPGameSessionBody(
-                                    false,
-                                    ExpandedMessage(1200, e.getMessage)
-                               )
+            case Success(d) => RESPGameSessionBody(true,ExpandedMessage(2200, d.details))
+            case Failure(e) => RESPGameSessionBody(false,ExpandedMessage(1200, e.getMessage))
           }
-        case None                =>
-          originalSender ! RESPGameSessionBody(
-            false,
-            ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists")
-          )
-      }
-
+        case None => RESPGameSessionBody(false,ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists"))
+      })
 
     case r: ExternalAPIParams.REQEndAGameByManagerWith =>
 
       val gameSession = GameSession(r.sessionID)
 
       val originalSender = sender()
-      activeGameSessionActors.get(r.sessionID) match {
+
+      originalSender ! (activeGameSessionCustodians.get(r.sessionID) match {
 
         case Some (sessionActor) =>
-
           val confirmation = (sessionActor ? HuddleGame.EvForceEndedByManager(
-                                                           System.currentTimeMillis(),
-                                                           GameSessionEndedByManager,
-                                                           r.managerName,
-                                                           gameSession)
+                                                              System.currentTimeMillis(),
+                                                              GameSessionEndedByManager,
+                                                              r.managerName,
+                                                              gameSession)
                              ).mapTo[RecordingStatus]
           confirmation.onComplete {
-            case Success(d) =>
-              originalSender ! RESPGameSessionBody(
-                true,
-                ExpandedMessage(2200, d.details)
-              )
-            case Failure(e) =>
-              originalSender ! RESPGameSessionBody(
-                false,
-                ExpandedMessage(1200, e.getMessage)
-              )
+            case Success(d) => RESPGameSessionBody(true,ExpandedMessage(2200, d.details))
+            case Failure(e) => RESPGameSessionBody(false,ExpandedMessage(1200, e.getMessage))
           }
-        case None                =>
-          originalSender ! RESPGameSessionBody(
-            false,
-            ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists")
-          )
+        case None => RESPGameSessionBody(false,ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists"))
+      })
 
-      }
     // TODO: Revisit the following handler. What is the best way to remember the session that the this
     // TODO: this terminated actor has been seeded with?
     case Terminated(sessionActor) =>
 
-      activeGameSessionActors = activeGameSessionActors - sessionActor.path.name
+      activeGameSessionCustodians = activeGameSessionCustodians - sessionActor.path.name
       log.info(s"Session Actor ($sessionActor) terminated." )
 
 
@@ -303,7 +217,6 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
     case (m: Any) =>
 
       println("Unknown message = [" + m + "] received!")
-//      context stop(self)
   }
 
 }

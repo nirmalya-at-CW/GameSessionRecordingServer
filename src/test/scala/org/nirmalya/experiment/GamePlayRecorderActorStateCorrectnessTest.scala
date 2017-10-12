@@ -8,7 +8,7 @@ import akka.actor.{ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
 import org.scalatest.{BeforeAndAfterAll, MustMatchers, WordSpecLike}
-import example.org.nirmalya.experiments.GamePlayRecorderActor
+import example.org.nirmalya.experiments.GameSessionStateHolderActor$
 import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.{GameSession, GameSessionEndedByManager, HuddleGame, QuestionAnswerTuple}
 import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.HuddleGame._
 import org.nirmalya.experiment.common.StopSystemAfterAll
@@ -60,7 +60,7 @@ class GamePlayRecorderActorStateCorrectnessTest extends TestKit(ActorSystem("Hud
       val dummyProbe = TestProbe()
 
       val gamePlayRecorderActor = system.actorOf(
-        GamePlayRecorderActor(
+        GameSessionStateHolderActor(
           true,
           gameSession,
           redisHost,
@@ -83,7 +83,7 @@ class GamePlayRecorderActorStateCorrectnessTest extends TestKit(ActorSystem("Hud
       val dummyProbe = TestProbe()
 
 
-      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor(
+      val gamePlayRecorderActor = system.actorOf(GameSessionStateHolderActor(
         true,
         gameSession,
         redisHost,
@@ -111,7 +111,7 @@ class GamePlayRecorderActorStateCorrectnessTest extends TestKit(ActorSystem("Hud
       val dummyProbe = TestProbe()
 
 
-      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor(
+      val gamePlayRecorderActor = system.actorOf(GameSessionStateHolderActor(
         true,
         gameSession,
         redisHost,
@@ -144,7 +144,7 @@ class GamePlayRecorderActorStateCorrectnessTest extends TestKit(ActorSystem("Hud
 
       val dummyProbe = TestProbe()
 
-      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor(
+      val gamePlayRecorderActor = system.actorOf(GameSessionStateHolderActor(
         true,
         gameSession,
         redisHost,
@@ -182,7 +182,7 @@ class GamePlayRecorderActorStateCorrectnessTest extends TestKit(ActorSystem("Hud
 
       val dummyProbe = TestProbe()
 
-      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor(
+      val gamePlayRecorderActor = system.actorOf(GameSessionStateHolderActor(
         true,
         gameSession,
         redisHost,
@@ -222,7 +222,7 @@ class GamePlayRecorderActorStateCorrectnessTest extends TestKit(ActorSystem("Hud
 
       val dummyProbe = TestProbe()
 
-      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor(
+      val gamePlayRecorderActor = system.actorOf(GameSessionStateHolderActor(
         true,
         gameSession,
         redisHost,
@@ -264,7 +264,7 @@ class GamePlayRecorderActorStateCorrectnessTest extends TestKit(ActorSystem("Hud
 
       val dummyProbe = TestProbe()
 
-      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor(
+      val gamePlayRecorderActor = system.actorOf(GameSessionStateHolderActor(
         true,
         gameSession,
         redisHost,
@@ -301,7 +301,7 @@ class GamePlayRecorderActorStateCorrectnessTest extends TestKit(ActorSystem("Hud
 
           val dummyProbe = TestProbe()
 
-          val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor(
+          val gamePlayRecorderActor = system.actorOf(GameSessionStateHolderActor(
             true,
             gameSession,
             redisHost,
@@ -342,7 +342,7 @@ class GamePlayRecorderActorStateCorrectnessTest extends TestKit(ActorSystem("Hud
 
       val dummyProbe = TestProbe()
 
-      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor(
+      val gamePlayRecorderActor = system.actorOf(GameSessionStateHolderActor(
         true,
         gameSession,
         redisHost,
@@ -376,7 +376,7 @@ class GamePlayRecorderActorStateCorrectnessTest extends TestKit(ActorSystem("Hud
 
       val dummyProbe = TestProbe()
 
-      val gamePlayRecorderActor = system.actorOf(GamePlayRecorderActor(
+      val gamePlayRecorderActor = system.actorOf(GameSessionStateHolderActor(
         true,
         gameSession,
         redisHost,

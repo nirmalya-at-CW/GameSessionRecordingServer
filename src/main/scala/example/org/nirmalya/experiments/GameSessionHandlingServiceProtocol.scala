@@ -17,19 +17,22 @@ object GameSessionHandlingServiceProtocol {
 
   object ExternalAPIParams {
 
-    case class REQStartAGameWith(companyName: String, companyID: String, manager: String, playerID: String, gameID: String, gameName: String, gameSessionUUID: String) {
+    case class REQStartAGameWith(companyID: String, departmentID: String, gameID: String, playerID: String,  companyName: String,  manager: String, gameName: String, gameSessionUUID: String) {
       override def toString =
         new StringBuffer().append(companyID)      .append(".")
+                          .append(departmentID)   .append(".")
+                          .append(gameID)         .append(".")
+                          .append(playerID)       .append(".")
                           .append(companyName)    .append(".")
                           .append(manager)        .append(".")
-                          .append(playerID)       .append(".")
-                          .append(gameID)         .append(".")
                           .append(gameName)       .append(".")
                           .append(gameSessionUUID)
         .toString
+
+      def jsonify = ()
     }
     case class REQSetQuizForGameWith(sessionID: String, questionMetadata: String )
-    case class REQPlayAGameWith(sessionID: String, questionID: String, answerID: String, isCorrect: Boolean, points: Int, timeSpentToAnswerAtFE: Int)
+    case class REQPlayAGameWith(sessionID: String, questionID: String, answerID: String, isCorrect: Boolean, points: Int, timeSpentToAnswerAtFE: Int) {}
     case class REQPlayAClipWith(sessionID: String, clipName: String)
     case class REQPauseAGameWith(sessionID: String)
     case class REQEndAGameWith(sessionID: String, totalTimeTakenByPlayerAtFE: Int)
@@ -47,12 +50,22 @@ object GameSessionHandlingServiceProtocol {
   case object  GameSessionEndedByManager extends GameSessionEndingReason
 
 
-  case class GameChosen(company: String, manager: String, playerID: String, gameName: String)
+  case class GameKey(companyID: String, departmentID: String, gameID: String, playerID: String) {
+    override def toString =
+      new StringBuffer().append(companyID)      .append(".")
+                        .append(departmentID)   .append(".")
+                        .append(gameID)         .append(".")
+                        .append(playerID)
+        .toString
+  }
   case class QuestionAnswerTuple(questionID: Int, answerID: Int, isCorrect: Boolean, points: Int, timeTakenToAnswerAtFE: Int)
 
-  case class GameSession(sessionID: String) {
-    override def toString = sessionID
+  case class GameSession(companyID: String, departmentID: String, gameID: String, playerID: String,  gameName: String, gameSessionUUID: String) {
+
+    val gameKey = GameKey(companyID,departmentID,gameID,playerID)
+    override def toString = new StringBuffer().append(gameKey.toString).append(".").append(gameSessionUUID).toString
   }
+
 
   sealed trait GameInfoTupleInREDIS
 
@@ -78,7 +91,7 @@ object GameSessionHandlingServiceProtocol {
         classOf[QuestionAnswerTuple],
         classOf[GameEndedTupleInREDIS],
         classOf[GamePreparedTupleInREDIS],
-        classOf[GameChosen],
+        classOf[GameKey],
         classOf[REQStartAGameWith],
         classOf[RecordingStatus],
         classOf[RESPGameSessionBody]
@@ -105,6 +118,7 @@ object GameSessionHandlingServiceProtocol {
     case class EvCleanUpRequired(gameSession: GameSession) extends HuddleGameEvent
     case class EvGamePlayRecordSoFarRequired(gameSession: GameSession) extends HuddleGameEvent
     case object EvGameShouldHaveStartedByNow extends HuddleGameEvent
+    case object EvGameShouldHaveEndedByNow   extends HuddleGameEvent
 
 
     sealed trait HuddleGameSessionState
