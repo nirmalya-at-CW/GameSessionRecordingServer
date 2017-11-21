@@ -1,10 +1,12 @@
 package example.org.nirmalya.experiments.MariaDBAware
 
 import java.sql.{Connection, DriverManager, Timestamp}
-import java.time.LocalDateTime
+import java.time.{LocalDateTime, ZoneId}
 
 import akka.actor.Actor.Receive
 import akka.actor.{Actor, ActorLogging, Props}
+import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.DBHatch.{DBActionGameSessionRecord, DBActionPlayerPerformanceRecord}
+import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.PlayerPerformanceRecordSP
 import org.jooq.SQLDialect
 import org.jooq.impl.DSL
 import generated.Tables._
@@ -12,20 +14,14 @@ import generated.Tables._
 import collection.JavaConverters._
 import scala.concurrent.ExecutionContextExecutor
 
-case class DBActionPlayerPerformanceToRetrieveAndUpsert(
-                 companyID: String, belongsToDepartment: String, playerID: String, gameID: String,
-                 companyName: String, manager: String, belongsToGroup: String, gameName: String,
-                 lastPlayedOn: LocalDateTime, timezoneApplicable: String,  scoreSoFar: Int)
+
 
 /**
   * Created by nirmalya on 4/10/17.
   */
 
-case class PlayerPerformance(companyID: String, belongsToDepartment: String, playerID: String, gameID: String,
-                             companyName: String, manager: String, belongsToGroup: String, gameName: String,
-                             lastPlayedOn: LocalDateTime, timezoneApplicable: String,  scoreSoFar: Int)
 
-class PlayerPerformanceButlerActor(
+class PlayerPerformanceDBButlerActor(
             val connectionString:   String,
             val dbAccessDispatcher: ExecutionContextExecutor
       ) extends Actor with ActorLogging {
@@ -34,12 +30,24 @@ class PlayerPerformanceButlerActor(
 
   override def receive: Receive =  {
 
-    case r: DBActionGameSessionRecordInsert =>
+    case r: PlayerPerformanceRecordSP =>
 
-      val rows = GameSessionRecordButlerActor
+      val dbRecord = DBActionPlayerPerformanceRecord(
+        r.companyID,
+        r.belongsToDepartment,
+        r.playerID,
+        r.gameID,
+        gameType="SP",
+        r.lastPlayedOn.toLocalDateTime,
+        r.timezoneApplicable,
+        r.pointsObtained,
+        r.timeTaken,
+        winsAchieved = 0
+      )
+      val rows = PlayerPerformanceDBButlerActor
                  .upsert(
                    DriverManager.getConnection(connectionString),
-                   r
+                   dbRecord
                  )
 
       sender ! rows
@@ -50,15 +58,15 @@ class PlayerPerformanceButlerActor(
 
 }
 
-object PlayerPerformanceButlerActor {
+object PlayerPerformanceDBButlerActor {
 
   def apply(connectionString: String, dbAccessDispatcher: ExecutionContextExecutor): Props =
 
-             Props(new GameSessionRecordButlerActor(connectionString,dbAccessDispatcher))
+             Props(new GameSessionDBButlerActor(dbAccessDispatcher))
 
   def retrieve(
         c: Connection, companyID: String, department: String, gameID: String, playerID: String)
-      : List[GameSessionRecord] = {
+      : List[DBActionPlayerPerformanceRecord] = {
 
     val e = DSL.using(c, SQLDialect.MARIADB)
     val x = PLAYERPERFORMANCE as "x"
@@ -68,7 +76,7 @@ object PlayerPerformanceButlerActor {
       .and(PLAYERPERFORMANCE.BELONGSTODEPARTMENT.eq(department))
       .and(PLAYERPERFORMANCE.GAMEID.eq(gameID))
       .and(PLAYERPERFORMANCE.PLAYERID.eq(playerID))
-      .fetchInto(classOf[GameSessionRecord])
+      .fetchInto(classOf[DBActionPlayerPerformanceRecord])
       .asScala
       .toList
 
@@ -77,12 +85,12 @@ object PlayerPerformanceButlerActor {
     // What if we return a list of Records from this method, keeping the equivalence between
     // Select and Upsert (below)? Does that bring any extra cleaner interface?
 
-    if (k.isEmpty) List(NonExistentGameSessionRecord) else k
+    if (k.isEmpty) List(NonExistentPlayerPerformance) else k
 
   }
 
   def upsert(
-        c: Connection, playerPerformanceData: DBActionGameSessionRecordInsert
+        c: Connection, playerPerformanceData: DBActionPlayerPerformanceRecord
       ) = {
 
     val e = DSL.using(c, SQLDialect.MARIADB)
@@ -93,13 +101,11 @@ object PlayerPerformanceButlerActor {
     playerPerformanceRecord.setBelongstodepartment     (playerPerformanceData.belongsToDepartment)
     playerPerformanceRecord.setPlayerid                (playerPerformanceData.playerID)
     playerPerformanceRecord.setGameid                  (playerPerformanceData.gameID)
-    playerPerformanceRecord.setCompanyname             (playerPerformanceData.companyName)
-    playerPerformanceRecord.setManager                 (playerPerformanceData.manager)
-    playerPerformanceRecord.setGamename                (playerPerformanceData.gameName)
-    playerPerformanceRecord.setBelongstogroup          (playerPerformanceData.belongsToGroup)
     playerPerformanceRecord.setLastplayedon            (Timestamp.valueOf(playerPerformanceData.lastPlayedOn))
     playerPerformanceRecord.setTimezoneapplicable      (playerPerformanceData.timezoneApplicable)
-    playerPerformanceRecord.setScoresofar              (playerPerformanceData.score)
+    playerPerformanceRecord.setPointsobtained          (playerPerformanceData.pointsObtained)
+    playerPerformanceRecord.setTimetaken               (playerPerformanceData.timeTaken)
+    playerPerformanceRecord.setWinsachieved            (playerPerformanceData.winsAchieved)
 
 
     e.insertInto(PLAYERPERFORMANCE)
@@ -113,5 +119,6 @@ object PlayerPerformanceButlerActor {
 }
 
 object NonExistentPlayerPerformance extends
-  GameSessionRecord("Unknown","Unknown","Unknown","Unknown","Unknown","Unknown","Unknown","Unknown",LocalDateTime.MIN,"Unknown",-1)
+  DBActionPlayerPerformanceRecord(
+    "Unknown","Unknown","Unknown","Unknown","Unknown",LocalDateTime.now(ZoneId.of("Z")),"Unknown",-1,-1,-1)
 

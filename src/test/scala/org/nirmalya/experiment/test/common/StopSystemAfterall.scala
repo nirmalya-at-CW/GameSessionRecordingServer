@@ -1,4 +1,4 @@
-package org.nirmalya.experiment.common
+package org.nirmalya.experiment.test.common
 
 import akka.testkit.TestKit
 import org.scalatest.{BeforeAndAfterAll, Suite}

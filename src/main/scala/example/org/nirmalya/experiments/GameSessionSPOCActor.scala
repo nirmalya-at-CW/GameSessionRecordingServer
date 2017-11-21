@@ -3,11 +3,14 @@ package example.org.nirmalya.experiments
 import java.util.concurrent.TimeUnit
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
+import akka.event.LoggingReceive
 import akka.pattern._
 import akka.util.Timeout
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.ExternalAPIParams.{ExpandedMessage, RESPGameSessionBody, Supplementary}
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.{ExternalAPIParams, GameSession, GameSessionEndedByManager, GameSessionEndedByPlayer, HuddleGame, QuestionAnswerTuple, RecordingStatus}
+import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.ExternalAPIParams._
+import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.{ExternalAPIParams, GameSession, GameSessionEndedByManager, GameSessionEndedByPlayer, HuddleGame, QuestionAnswerTuple, RedisRecordingStatus}
+import example.org.nirmalya.experiments.MariaDBAware.GameSessionDBButlerActor
 
+import scala.concurrent.Future
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.util.{Failure, Success}
 
@@ -22,12 +25,7 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
 
   implicit val executionContext = context.dispatcher
 
-  implicit val askTimeOutDuration:Timeout = Duration(
-    context.system.settings.config.
-      getConfig("GameSession.maxResponseTimeLimit").
-      getString("duration").
-      toInt,
-    "seconds")
+
 
 
   val (redisHost,redisPort) = (
@@ -35,36 +33,63 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
     context.system.settings.config.getConfig("GameSession.redisEndPoint").getInt("port")
   )
 
-  val maxGameSessionLifetime = FiniteDuration(
-    context.system.settings.config.getConfig("GameSession.maxGameSessionLifetime").getInt("duration"),
-    TimeUnit.SECONDS)
+  val maxGameSessionLifetime =
+    FiniteDuration(
+        context.system.settings.config.getConfig("GameSession.maxGameSessionLifetime").getInt("duration"),
+        TimeUnit.SECONDS
+    )
+
+  val dbAccessURL = context.system.settings.config.getConfig("GameSession.externalServices").getString("dbAccessURL")
+
+  // TODO: arrange for a specific dispatcher for the actors, accessing databases.
+  val gameSessionRecordDBButler = context.actorOf(GameSessionDBButlerActor(context.system.dispatcher))
 
   var activeGameSessionCustodians: Map[String, ActorRef] = Map.empty
 
-  def receive = {
+  implicit val askTimeOutDuration:Timeout = Duration(
+    context.system.settings.config.
+      getConfig("GameSession.maxResponseTimeLimit").
+      getString("duration").
+      toInt,
+    "seconds")
+
+  def receive = LoggingReceive.withLabel("SPOC") {
 
     case r: ExternalAPIParams.REQStartAGameWith =>
-      val gameSession = GameSession(r.companyID,r.departmentID,r.gameID,r.playerID,r.gameName, r.gameSessionUUID)
+      val gameSessionInfo = GameSession(
+        r.companyID,
+        r.departmentID,
+        r.gameID,
+        r.playerID,
+        r.gameName,
+        r.gameSessionUUID,
+        r.groupID.getOrElse("NOTSET"),
+        r.gameType,
+        r.playedInTimezone
+      )
 
       if (activeGameSessionCustodians.isDefinedAt(r.gameSessionUUID))
-        sender ! RESPGameSessionBody(false, ExpandedMessage(1200, s"GameSession with $r is already active."))
+        sender ! RESPGameSessionBodyWhenFailed(ExpandedMessage(1200, s"GameSession with $r is already active."))
       else {
         val originalSender = sender()
         val child = context.actorOf(
-          GameSessionStateHolderActor(
-            true,
-            gameSession,
-            redisHost,
-            redisPort,
-            maxGameSessionLifetime,
-            gameSessionFinishEmitter
-          ), gameSession.toString)
+              GameSessionCustodianActor(
+                  gameSessionInfo,
+                  redisHost,
+                  redisPort,
+                  maxGameSessionLifetime,
+                  gameSessionFinishEmitter,
+                  dbAccessURL
+              ),
+              gameSessionInfo.toString
+           )
         context.watch(child) // Because we want to restart failing actors
                              // TODO: implement logic to restart!
 
         this.activeGameSessionCustodians = this.activeGameSessionCustodians + Tuple2(r.gameSessionUUID,child)
 
-        (child ? HuddleGame.EvInitiated(System.currentTimeMillis(), gameSession)).pipeTo(sender)
+        // TODO: We need to send an appropriate RESP object here; just a pipeTo may be inadequate.
+        (child ? HuddleGame.EvInitiated(System.currentTimeMillis())).pipeTo(sender)
 
       }
 
@@ -72,146 +97,126 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
 
       val originalSender = sender()
 
-      originalSender ! (activeGameSessionCustodians.get(r.sessionID) match {
+      activeGameSessionCustodians.get(r.sessionID) match {
 
-                         case Some (sessionActor) => {
-                           val confirmation = (sessionActor ? HuddleGame.EvQuizIsFinalized(
-                                                                System.currentTimeMillis(),
-                                                                r.questionMetadata,
-                                                                gameSession)
-                                              ).mapTo[RecordingStatus]
-                           confirmation.onComplete {
-                             case Success(d) => RESPGameSessionBody(true,ExpandedMessage(2200, d.details))
-                             case Failure(e) => RESPGameSessionBody(false,ExpandedMessage(1200, e.getMessage))
-                           }
-                         }
-                         case None  => RESPGameSessionBody(false,ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists"))
-                       })
+         case Some (sessionActor) =>
+           (sessionActor ? HuddleGame.EvQuizIsFinalized(System.currentTimeMillis(),r.questionMetadata)).pipeTo(originalSender)
+         case None  =>
+           originalSender ! RESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists"))
+      }
 
 
     case r: ExternalAPIParams.REQPlayAGameWith =>
 
-      val gameSession = GameSession(r.sessionID)
-
       val originalSender = sender()
 
-      originalSender ! (activeGameSessionCustodians.get(r.sessionID) match {
+      activeGameSessionCustodians.get(r.sessionID) match {
 
-                          case Some (sessionActor) => {
-                                              val confirmation = (sessionActor ? HuddleGame.EvQuestionAnswered(
-                                                                                    System.currentTimeMillis(),
-                                                                                    QuestionAnswerTuple(
-                                                                                      r.questionID.toInt,
-                                                                                      r.answerID.toInt,
-                                                                                      r.isCorrect,
-                                                                                      r.points,
-                                                                                      r.timeSpentToAnswerAtFE
-                                                                                    ),
-                                                                                    gameSession
-                                                                                  )
-                                                ).mapTo[RecordingStatus]
-                                                confirmation.onComplete {
-                                                  case Success(d) => RESPGameSessionBody(true,ExpandedMessage(2200, d.details))
-                                                  case Failure(e) => RESPGameSessionBody(false,ExpandedMessage(1200, e.getMessage))
-                                                }
-                                              }
-                          case None  => RESPGameSessionBody(false,ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists"))
-                        })
+          case Some (sessionActor) =>
+
+              (sessionActor ? HuddleGame.EvQuestionAnswered(
+                                                    System.currentTimeMillis(),
+                                                    QuestionAnswerTuple(
+                                                      r.questionID.toInt,
+                                                      r.answerID.toInt,
+                                                      r.isCorrect,
+                                                      r.points,
+                                                      r.timeSpentToAnswerAtFE
+                                                    )
+                                                  )
+              )
+              .recoverWith{
+                case e: AskTimeoutException => Future(RESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"Request TimedOut")))
+              }
+              .pipeTo(originalSender)
+
+          case None  =>
+            originalSender ! RESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists"))
+      }
 
 
     case r: ExternalAPIParams.REQPlayAClipWith =>
 
-      val gameSession = GameSession(r.sessionID)
-
       val originalSender = sender()
-      originalSender ! (activeGameSessionCustodians.get(r.sessionID) match {
 
-                          case Some (sessionActor) =>
-                            val confirmation =
-                              (sessionActor ? HuddleGame.EvPlayingClip(
-                                                          System.currentTimeMillis(),
-                                                           r.clipName,
-                                                           gameSession
-                                                         )
-                              ).mapTo[RecordingStatus]
-                            confirmation.onComplete {
-                              case Success(d) => RESPGameSessionBody(true,ExpandedMessage(2200, d.details))
-                              case Failure(e) => RESPGameSessionBody(false,ExpandedMessage(1200, e.getMessage))
-                            }
-                          case None => RESPGameSessionBody(false,ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists"))
-                        })
+      activeGameSessionCustodians.get(r.sessionID) match {
+
+      case Some (sessionActor) =>
+        (sessionActor ? HuddleGame.EvPlayingClip(System.currentTimeMillis(),r.clipName))
+        .recoverWith{
+            case e: AskTimeoutException => Future(RESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"Request TimedOut")))
+        }
+        .pipeTo(originalSender)
+      case None =>
+        originalSender ! RESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists"))
+      }
 
     case r: ExternalAPIParams.REQPauseAGameWith =>
-      val gameSession = GameSession(r.sessionID)
 
       val originalSender = sender()
 
-      originalSender ! (activeGameSessionCustodians.get(r.sessionID) match {
+      activeGameSessionCustodians.get(r.sessionID) match {
 
         case Some (sessionActor) =>
-          val confirmation =
-            (sessionActor ? HuddleGame.EvPaused(System.currentTimeMillis(), gameSession)).mapTo[RecordingStatus]
-          confirmation.onComplete {
-            case Success(d) => RESPGameSessionBody(true,ExpandedMessage(2200, d.details))
-            case Failure(e) => RESPGameSessionBody(false,ExpandedMessage(1200, e.getMessage))
+          (sessionActor ? HuddleGame.EvPaused(System.currentTimeMillis()))
+          .recoverWith{
+            case e: AskTimeoutException => Future(RESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"Request TimedOut")))
           }
-        case None => RESPGameSessionBody(false,ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists"))
-      })
-
+          .pipeTo(originalSender)
+        case None =>
+          originalSender ! RESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists"))
+      }
 
     case r: ExternalAPIParams.REQEndAGameWith =>
 
-      val gameSession = GameSession(r.sessionID)
-
       val originalSender = sender()
 
-      originalSender ! (activeGameSessionCustodians.get(r.sessionID) match {
+      activeGameSessionCustodians.get(r.sessionID) match {
 
         case Some (sessionActor) =>
-          val confirmation = (sessionActor ? HuddleGame.EvEnded(
-                                                          System.currentTimeMillis(),
-                                                          GameSessionEndedByPlayer,
-                                                          r.totalTimeTakenByPlayerAtFE,
-                                                          gameSession)
-                             ).mapTo[RecordingStatus]
-          confirmation.onComplete {
-            case Success(d) => RESPGameSessionBody(true,ExpandedMessage(2200, d.details))
-            case Failure(e) => RESPGameSessionBody(false,ExpandedMessage(1200, e.getMessage))
+          (sessionActor ? HuddleGame.EvEndedByPlayer(
+                                      System.currentTimeMillis(),
+                                      r.totalTimeTakenByPlayerAtFE
+                          ))
+          .recoverWith{
+            case e: AskTimeoutException => Future(RESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"Request TimedOut")))
           }
-        case None => RESPGameSessionBody(false,ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists"))
-      })
+          .pipeTo(originalSender)
+
+        case None =>
+          originalSender ! RESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists"))
+      }
 
     case r: ExternalAPIParams.REQEndAGameByManagerWith =>
 
-      val gameSession = GameSession(r.sessionID)
-
       val originalSender = sender()
 
-      originalSender ! (activeGameSessionCustodians.get(r.sessionID) match {
+      activeGameSessionCustodians.get(r.sessionID) match {
 
         case Some (sessionActor) =>
-          val confirmation = (sessionActor ? HuddleGame.EvForceEndedByManager(
-                                                              System.currentTimeMillis(),
-                                                              GameSessionEndedByManager,
-                                                              r.managerName,
-                                                              gameSession)
-                             ).mapTo[RecordingStatus]
-          confirmation.onComplete {
-            case Success(d) => RESPGameSessionBody(true,ExpandedMessage(2200, d.details))
-            case Failure(e) => RESPGameSessionBody(false,ExpandedMessage(1200, e.getMessage))
+          (sessionActor ? HuddleGame.EvForceEndedByManager(
+                                      System.currentTimeMillis(),
+                                      r.managerName)
+          )
+          .recoverWith{
+            case e: AskTimeoutException => Future(RESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"Request TimedOut")))
           }
-        case None => RESPGameSessionBody(false,ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists"))
-      })
+          .pipeTo(originalSender)
+
+        case None =>
+          originalSender ! RESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists"))
+      }
 
     // TODO: Revisit the following handler. What is the best way to remember the session that the this
     // TODO: this terminated actor has been seeded with?
-    case Terminated(sessionActor) =>
+    case Terminated(custodianActor) =>
 
-      activeGameSessionCustodians = activeGameSessionCustodians - sessionActor.path.name
-      log.info(s"Session Actor ($sessionActor) terminated." )
+      // TODO: Change the mechanism to extract SessionUUID, as below. We will shorten the Actor Name, to hold
+      // TODO: only the SessionUUID in the next version.
+      val custodianKey =  custodianActor.path.name.split("\\.").toIndexedSeq(5)
 
-
-    case (ShutYourself) =>
+       activeGameSessionCustodians = activeGameSessionCustodians - custodianKey
+      log.info(s"Custodian Actor ($custodianActor) terminated." )
       context stop(self)
 
     case (m: Any) =>

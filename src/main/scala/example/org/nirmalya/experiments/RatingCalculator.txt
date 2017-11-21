@@ -1,0 +1,97 @@
+package example.org.nirmalya.experiments
+
+/**
+  * Created by nirmalya on 14/11/17.
+  */
+object RatingCalculator {
+
+  object MaximumPointsScorable extends Enumeration {
+    val  PerGameSession   = 7500
+    val  InAMinute        = 6000
+  }
+
+  object ProjectingComponentOnFinalRank extends Enumeration {
+    val  FactorForPower = 60
+    val  FactorForSpeed = 20
+    val  FactorForWin   = 20
+  }
+
+  trait PlayerPerformance {
+    val companyID: String
+    val departmentID: String
+    val playerID: String
+    val gameID: String
+    val totalPointsSoFar: Int
+    val totalGamesSoFar: Int
+  }
+
+  case class PlayerPerformanceSP(
+                                  companyID: String, override val departmentID: String, playerID: String, gameID: String,
+                                  totalPointsSoFar: Int, totalGamesSoFar: Int
+                                ) extends PlayerPerformance(companyID,departmentID,playerID,gameID,totalPointsSoFar,totalGamesSoFar)
+
+  case class PlayerPerformanceMP(
+                                  override val companyID: String, departmentID: String, playerID: String, gameID: String,
+                                  totalGamesSoFar: Int, totalPointsSoFar: Int, totalWinsSoFar: Int
+                                ) extends PlayerPerformance(companyID,departmentID,playerID,gameID,totalPointsSoFar,totalGamesSoFar)
+
+  sealed trait RankComponentCalculator
+  case class   PowerCalculator (playerPerformance: PlayerPerformanceSP) extends RankComponentCalculator {
+
+    val avgPointsPerGame = playerPerformance.totalPointsSoFar / playerPerformance.totalGamesSoFar
+
+    def determinePower =
+      (avgPointsPerGame * MaximumPointsScorable.PerGameSession) / ProjectingComponentOnFinalRank.FactorForPower
+
+  }
+  case class   SpeedCalculator (playerPerformance: PlayerPerformanceSP, timeTakenInjustFinishedSession: Int) extends RankComponentCalculator {
+
+    val pointsScoredPerMinute = playerPerformance.totalPointsSoFar / timeTakenInjustFinishedSession
+    def determineSpeed = (pointsScoredPerMinute * MaximumPointsScorable.InAMinute) / ProjectingComponentOnFinalRank.FactorForSpeed
+  }
+
+  case class   WinsCalculator (playerPerformance: PlayerPerformanceMP) extends RankComponentCalculator {
+    val winningRatio = playerPerformance.totalWinsSoFar / playerPerformance.totalGamesSoFar
+    def determineWins = winningRatio * ProjectingComponentOnFinalRank.FactorForWin
+  }
+
+  sealed trait Ranker {
+    def calculateRank:  Float
+  }
+  case class SinglePlayerRanker(
+                                 basedOnPerformanceSofar: PlayerPerformanceSP,
+                                 pointsObtainedInJustFinishedSession: Int,
+                                 timeTakenInjustFinishedSession: Int) extends Ranker {
+
+    val accumulatedPoinstsObtainedSoFar = basedOnPerformanceSofar.totalPointsSoFar + pointsObtainedInJustFinishedSession
+    val accumulatedGamesPlayedSoFar     = basedOnPerformanceSofar.totalGamesSoFar  + 1
+    val updatedPerformance              = basedOnPerformanceSofar.copy(
+      totalGamesSoFar = accumulatedGamesPlayedSoFar,
+      totalPointsSoFar = accumulatedPoinstsObtainedSoFar)
+    val powerCalculator  = new PowerCalculator(updatedPerformance)
+
+    val speedCalculator  = new SpeedCalculator(updatedPerformance, timeTakenInjustFinishedSession)
+
+    override def calculateRank: Float = powerCalculator.determinePower + speedCalculator.determineSpeed
+
+  }
+
+  case class MultiPlayerRanker(
+                                basedOnPerformanceSofar: PlayerPerformanceMP,
+                                pointsObtainedInJustFinishedSession: Int,
+                                timeTakenInjustFinishedSession: Int) extends Ranker {
+
+    val accumulatedPoinstsObtainedSoFar = basedOnPerformanceSofar.totalPointsSoFar + pointsObtainedInJustFinishedSession
+    val accumulatedGamesPlayedSoFar     = basedOnPerformanceSofar.totalGamesSoFar  + 1
+    val updatedPerformance              = basedOnPerformanceSofar.copy(
+      totalGamesSoFar = accumulatedGamesPlayedSoFar,
+      totalPointsSoFar = accumulatedPoinstsObtainedSoFar)
+    val powerCalculator  = new PowerCalculator(updatedPerformance)
+
+    val speedCalculator  = new SpeedCalculator(updatedPerformance, timeTakenInjustFinishedSession)
+
+    override def calculateRank: Float = powerCalculator.determinePower + speedCalculator.determineSpeed
+
+  }
+  
+}

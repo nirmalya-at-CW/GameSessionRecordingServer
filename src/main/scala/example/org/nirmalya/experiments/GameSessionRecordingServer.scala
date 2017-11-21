@@ -26,7 +26,7 @@ import collection.JavaConversions._
 import scala.util.{Failure, Success, Try}
 import de.heikoseeberger.akkahttpjson4s.Json4sSupport
 import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.ExternalAPIParams._
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.RecordingStatus
+import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.RedisRecordingStatus
 
 
 

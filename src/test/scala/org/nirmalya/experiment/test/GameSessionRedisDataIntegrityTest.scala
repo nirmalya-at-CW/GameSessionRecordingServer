@@ -1,4 +1,4 @@
-package org.nirmalya.experiment
+package org.nirmalya.experiment.test
 
 import java.util.concurrent.TimeUnit
 
@@ -8,15 +8,16 @@ import org.scalatest._
 import Matchers._
 import com.redis.RedisClient
 import org.json4s.native.Serialization.{read, write}
-import example.org.nirmalya.experiments.{GameSessionStateHolderActor$, GameSessionSPOCActor}
+import example.org.nirmalya.experiments.GameSessionStateHolderActor
 import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.HuddleGame.{GameSessionHasStartedState, GameSessionIsContinuingState, GameSessionIsPausedState, GameSessionYetToStartState}
 import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol._
-import org.nirmalya.experiment.common.StopSystemAfterAll
+
 import org.scalatest.{BeforeAndAfterAll, MustMatchers, WordSpecLike}
 
 import scala.concurrent.duration._
 import akka.testkit._
 import com.typesafe.config.ConfigFactory
+import org.nirmalya.experiment.test.common.StopSystemAfterAll
 
 import scala.language.postfixOps
 
@@ -24,7 +25,7 @@ import scala.language.postfixOps
 /**
   * Created by nirmalya on 11/6/17.
   */
-class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("HuddleGame-system"))
+class GameSessionRedisDataIntegrityTest extends TestKit(ActorSystem("HuddleGame-system"))
   with WordSpecLike
   with MustMatchers
   with BeforeAndAfterAll
@@ -39,15 +40,17 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
     config.getConfig("GameSession.redisEndPoint").getInt("port")
   )
 
-  val maxGameTimeOut = Duration(
-    config.getConfig("GameSession.maxGameTimeOut").getInt("duration"),
+  val maxGameSessionLifetime = Duration(
+    config.getConfig("GameSession.maxGameSessionLifetime").getInt("duration"),
     TimeUnit.SECONDS
   )
 
+
   val redisUpdateIndicatorAwaitingTime = Duration(
-    config.getConfig("GameSession.maxGameTimeOut").getInt("duration") + 10,
+    config.getConfig("GameSession.maxGameSessionLifetime").getInt("duration"),
     TimeUnit.SECONDS
   )
+
 
   val redisClient = new RedisClient(redisHost, redisPort)
 
@@ -73,7 +76,9 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
 
       val probe1 = TestProbe()
 
-      val gameSession = GameSession(keyPrefix + actorName)
+
+      val gameSession = GameSession("CW","QA","G01","P01","Tic-Tac-Toe","UUID-1",playedInTimezone = "Asia/Calcutta")
+
 
       val gamePlayRecorderActor = system.actorOf(
         GameSessionStateHolderActor(
@@ -81,20 +86,19 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
           gameSession,
           redisHost,
           redisPort,
-          maxGameTimeOut,
-          probe1.ref
-        ),actorName)
+          maxGameSessionLifetime
+        ),(actorName + "." + gameSession.gameSessionKey))
 
-      gamePlayRecorderActor ! HuddleGame.EvInitiated(gameStartsAt, gameSession)
+      gamePlayRecorderActor ! HuddleGame.EvInitiated(gameStartsAt)
 
-      expectMsg(RecordingStatus("Initiated"))
+      expectMsg("Initiated")
 
-      gamePlayRecorderActor ! HuddleGame.EvGamePlayRecordSoFarRequired(gameSession)
+      gamePlayRecorderActor ! HuddleGame.EvGamePlayRecordSoFarRequired
 
       expectMsgPF(2 second) {
 
-        case m: RecordingStatus =>
-          val sessionHistoryAsJSON = m.details
+        case m: String =>
+          val sessionHistoryAsJSON = m
           val completeHistory = read[CompleteGamePlaySessionHistory](sessionHistoryAsJSON)
           completeHistory.elems.length should be (2)
           completeHistory.elems.toIndexedSeq(0) shouldBe a [GameCreatedTupleInREDIS]
@@ -114,46 +118,43 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
 
       val probe1 = TestProbe()
 
-      val gameSession = GameSession(keyPrefix + actorName)
+      val gameSession = GameSession("CW","QA","G01","P01","Tic-Tac-Toe","UUID-2",playedInTimezone = "Asia/Calcutta")
 
       val gamePlayRecorderActor = system.actorOf(
         GameSessionStateHolderActor(
-            true,
-            gameSession,
-            redisHost,
-            redisPort,
-            maxGameTimeOut,
-            probe1.ref
-          ),actorName)
+          true,
+          gameSession,
+          redisHost,
+          redisPort,
+          maxGameSessionLifetime
+        ),(actorName + "." + gameSession.gameSessionKey))
 
-      gamePlayRecorderActor ! HuddleGame.EvInitiated(gameStartsAt, gameSession)
-      expectMsg(RecordingStatus("Initiated"))
+      gamePlayRecorderActor ! HuddleGame.EvInitiated(gameStartsAt)
+      expectMsg(("Initiated"))
 
-      gamePlayRecorderActor ! HuddleGame.EvQuizIsFinalized(gameStartsAt+1,"Some metadata",gameSession)
-      expectMsg(RecordingStatus("Prepared"))
+      gamePlayRecorderActor ! HuddleGame.EvQuizIsFinalized(gameStartsAt+1,"Some metadata")
+      expectMsg(("Prepared"))
 
-      gamePlayRecorderActor ! HuddleGame.EvQuestionAnswered(gameStartsAt+2,questionaAndAnswers(0),gameSession)
-      expectMsg(RecordingStatus("QuestionAnswered"))
-
-
-      gamePlayRecorderActor ! HuddleGame.EvPaused(gameStartsAt+3,gameSession)
-      expectMsg(RecordingStatus("Paused"))
+      gamePlayRecorderActor ! HuddleGame.EvQuestionAnswered(gameStartsAt+2,questionaAndAnswers(0))
+      expectMsg(("QuestionAnswered"))
 
 
-      gamePlayRecorderActor ! HuddleGame.EvQuestionAnswered(gameStartsAt+4,questionaAndAnswers(1),gameSession)
-      expectMsg(RecordingStatus("QuestionAnswered"))
+      gamePlayRecorderActor ! HuddleGame.EvPaused(gameStartsAt+3)
+      expectMsg(("Paused"))
 
-      gamePlayRecorderActor ! HuddleGame.EvEnded(
+
+      gamePlayRecorderActor ! HuddleGame.EvQuestionAnswered(gameStartsAt+4,questionaAndAnswers(1))
+      expectMsg(("QuestionAnswered"))
+
+      gamePlayRecorderActor ! HuddleGame.EvEndedByPlayer(
                                            gameStartsAt+5,
-                                           GameSessionEndedByPlayer,
-                                           5,
-                                           gameSession)
+                                           5)
 
       expectMsgPF(2 second) {
 
-        case m: RecordingStatus =>
+        case m: String =>
 
-          m.details should be ("Ended")
+          m should be ("Ended")
       }
 
       val history = redisClient.hget(gameSession, "SessionHistory")
@@ -201,41 +202,38 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
 
       val probe1 = TestProbe()
 
-      val gameSession = GameSession(keyPrefix + "-" + actorName)
+      val gameSession = GameSession("CW","QA","G01","P01","Tic-Tac-Toe","UUID-4",playedInTimezone = "Asia/Calcutta")
 
       val gamePlayRecorderActor = system.actorOf(
         GameSessionStateHolderActor(
-              true,
-              gameSession,
-              redisHost,
-              redisPort,
-              maxGameTimeOut,
-              probe1.ref
-        ),actorName
-      )
+          true,
+          gameSession,
+          redisHost,
+          redisPort,
+          maxGameSessionLifetime
+        ),(actorName + "." + gameSession.gameSessionKey))
+      gamePlayRecorderActor ! HuddleGame.EvInitiated(gameStartsAt)
+      expectMsg(("Initiated"))
 
-      gamePlayRecorderActor ! HuddleGame.EvInitiated(gameStartsAt, gameSession)
-      expectMsg(RecordingStatus("Initiated"))
+      gamePlayRecorderActor ! HuddleGame.EvQuizIsFinalized(gameStartsAt+1,List(1,2,3,4).mkString("|"))
+      expectMsg(("Prepared"))
 
-      gamePlayRecorderActor ! HuddleGame.EvQuizIsFinalized(gameStartsAt+1,List(1,2,3,4).mkString("|"),gameSession)
-      expectMsg(RecordingStatus("Prepared"))
+      gamePlayRecorderActor ! HuddleGame.EvQuestionAnswered(gameStartsAt+2,questionaAndAnswers(0))
+      expectMsg(("QuestionAnswered"))
 
-      gamePlayRecorderActor ! HuddleGame.EvQuestionAnswered(gameStartsAt+2,questionaAndAnswers(0),gameSession)
-      expectMsg(RecordingStatus("QuestionAnswered"))
-
-      gamePlayRecorderActor ! HuddleGame.EvPaused(gameStartsAt+3,gameSession)
-      expectMsg(RecordingStatus("Paused"))
+      gamePlayRecorderActor ! HuddleGame.EvPaused(gameStartsAt+3)
+      expectMsg(("Paused"))
 
       // Successive Pause, will be ignored by the GameSession's FSM
-      gamePlayRecorderActor ! HuddleGame.EvPaused(gameStartsAt+4,gameSession)
+      gamePlayRecorderActor ! HuddleGame.EvPaused(gameStartsAt+4)
       expectNoMsg(2 second)
 
-      gamePlayRecorderActor ! HuddleGame.EvEnded(gameStartsAt+5,GameSessionEndedByPlayer, 2, gameSession)
+      gamePlayRecorderActor ! HuddleGame.EvEndedByPlayer(gameStartsAt+5, 2)
 
       expectMsgPF(2 second) {
 
-        case m: RecordingStatus =>
-          m.details should be ("Ended")
+        case m: String =>
+          m should be ("Ended")
       }
 
       val history = redisClient.hget(gameSession, "SessionHistory")
@@ -280,7 +278,7 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
 
       val probe1 = TestProbe()
 
-      val gameSession = GameSession(keyPrefix + "-" + actorName)
+      val gameSession = GameSession("CW","QA","G01","P01","Tic-Tac-Toe","UUID-5",playedInTimezone = "Asia/Calcutta")
 
       val gamePlayRecorderActor = system.actorOf(
         GameSessionStateHolderActor(
@@ -288,23 +286,22 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
           gameSession,
           redisHost,
           redisPort,
-          FiniteDuration(6,TimeUnit.SECONDS), // Overriding the maxGameTimeOut value here, because we want the testcase to finish fast
-          probe1.ref
-        ),actorName
-      )
-
-      gamePlayRecorderActor ! HuddleGame.EvInitiated(gameStartsAt, gameSession)
-      expectMsg(RecordingStatus("Initiated"))
-
-      gamePlayRecorderActor ! HuddleGame.EvQuizIsFinalized(gameStartsAt+1,List(1,2,3,4).mkString("|"),gameSession)
-      expectMsg(RecordingStatus("Prepared"))
+          FiniteDuration(6,TimeUnit.SECONDS) // Overriding the maxGameTimeOut value here, because we want the testcase to finish fast
+        ),(actorName + "." + gameSession.gameSessionKey))
 
 
-      gamePlayRecorderActor ! HuddleGame.EvQuestionAnswered(gameStartsAt+2,questionaAndAnswers(0),gameSession)
-      expectMsg(RecordingStatus("QuestionAnswered"))
+      gamePlayRecorderActor ! HuddleGame.EvInitiated(gameStartsAt)
+      expectMsg(("Initiated"))
 
-      gamePlayRecorderActor ! HuddleGame.EvPaused(gameStartsAt+3,gameSession)
-      expectMsg(RecordingStatus("Paused"))
+      gamePlayRecorderActor ! HuddleGame.EvQuizIsFinalized(gameStartsAt+1,List(1,2,3,4).mkString("|"))
+      expectMsg(("Prepared"))
+
+
+      gamePlayRecorderActor ! HuddleGame.EvQuestionAnswered(gameStartsAt+2,questionaAndAnswers(0))
+      expectMsg(("QuestionAnswered"))
+
+      gamePlayRecorderActor ! HuddleGame.EvPaused(gameStartsAt+3)
+      expectMsg(("Paused"))
 
       awaitCond(
         {
@@ -367,7 +364,7 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
 
       val probe1 = TestProbe()
 
-      val gameSession = GameSession(keyPrefix + "-" + actorName)
+      val gameSession = GameSession("CW","QA","G01","P01","Tic-Tac-Toe","UUID-5",playedInTimezone = "Asia/Calcutta")
 
       val gamePlayRecorderActor = system.actorOf(
         GameSessionStateHolderActor(
@@ -375,26 +372,25 @@ class GamePlayRecorderActorRedisDataIntegrityTest extends TestKit(ActorSystem("H
           gameSession,
           redisHost,
           redisPort,
-          FiniteDuration(6,TimeUnit.SECONDS), // Overriding the maxGameTimeOut value here, because we want the testcase to finish fast
-          probe1.ref
-        ),actorName
-      )
-
-      gamePlayRecorderActor ! HuddleGame.EvInitiated(gameStartsAt, gameSession)
-      expectMsg(RecordingStatus("Initiated"))
-
-      gamePlayRecorderActor ! HuddleGame.EvQuizIsFinalized(gameStartsAt+1,List(1,2,3,4).mkString("|"),gameSession)
-      expectMsg(RecordingStatus("Prepared"))
+          FiniteDuration(6,TimeUnit.SECONDS) // Overriding the maxGameTimeOut value here, because we want the testcase to finish fast
+        ),(actorName + "." + gameSession.gameSessionKey))
 
 
-      gamePlayRecorderActor ! HuddleGame.EvQuestionAnswered(gameStartsAt+2,questionaAndAnswers(0),gameSession)
-      expectMsg(RecordingStatus("QuestionAnswered"))
+      gamePlayRecorderActor ! HuddleGame.EvInitiated(gameStartsAt)
+      expectMsg(("Initiated"))
 
-      gamePlayRecorderActor ! HuddleGame.EvPaused(gameStartsAt+3,gameSession)
-      expectMsg(RecordingStatus("Paused"))
+      gamePlayRecorderActor ! HuddleGame.EvQuizIsFinalized(gameStartsAt+1,List(1,2,3,4).mkString("|"))
+      expectMsg(("Prepared"))
 
-      gamePlayRecorderActor ! HuddleGame.EvForceEndedByManager(gameStartsAt+4,GameSessionEndedByManager,"Vikas",gameSession)
-      expectMsg(RecordingStatus("Ended"))
+
+      gamePlayRecorderActor ! HuddleGame.EvQuestionAnswered(gameStartsAt+2,questionaAndAnswers(0))
+      expectMsg(("QuestionAnswered"))
+
+      gamePlayRecorderActor ! HuddleGame.EvPaused(gameStartsAt+3)
+      expectMsg(("Paused"))
+
+      gamePlayRecorderActor ! HuddleGame.EvForceEndedByManager(gameStartsAt+4,"Vikas")
+      expectMsg(("Ended"))
 
       awaitCond(
         {

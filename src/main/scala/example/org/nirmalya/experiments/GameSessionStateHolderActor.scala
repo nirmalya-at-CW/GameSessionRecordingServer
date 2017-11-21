@@ -1,16 +1,13 @@
 package example.org.nirmalya.experiments
 
-import akka.actor.{ActorLogging, ActorRef, Cancellable, FSM, Props}
-import com.redis.RedisClient
-import GameSessionHandlingServiceProtocol.{HuddleGame, NonExistingCompleteGamePlaySessionHistory, RecordingStatus, _}
-import GameSessionHandlingServiceProtocol.HuddleGame._
-import example.org.nirmalya.experiments.MariaDBAware.GameSessionRecordButlerActor
-import example.org.nirmalya.experiments.RedisAware.RedisButlerGameSessionRecording
-import org.json4s._
-import org.json4s.native.JsonMethods._
-import org.json4s.native.Serialization.{read, write}
+import java.time.{Instant, ZoneId, ZoneOffset}
 
-import scala.concurrent.duration.{Duration, FiniteDuration, TimeUnit}
+import akka.actor.{ActorLogging, FSM, LoggingFSM, Props}
+import GameSessionHandlingServiceProtocol.{HuddleGame, NonExistingCompleteGamePlaySessionHistory, RedisRecordingStatus, _}
+import GameSessionHandlingServiceProtocol.HuddleGame.{EvGamePlayRecordSoFarRequired, _}
+import example.org.nirmalya.experiments.RedisAware.RedisButlerGameSessionRecording
+
+import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.ExecutionContext.Implicits.global
 
 
@@ -21,16 +18,8 @@ class GameSessionStateHolderActor(val cleanDataOnExit: Boolean,
                                   val seededWithSession: GameSession,
                                   val redisHost: String,
                                   val redisPort: Int,
-                                  val maxGameSessionLifetime: FiniteDuration,
-                                  val sessionCompletionEvReceiverActor: ActorRef
-                           ) extends FSM [HuddleGameSessionState, HuddleGameFSMData] with ActorLogging {
-
-  // TODO: pick these parameters from config
-  val dbConnectionString = "jdbc:mariadb://localhost:3306/OneHuddle?user=nuovo&password=nuovo123"
-
-  //TODO: instead of making this a direct child, we should create a router and encapsulate that with HTTP apis.
-  val gameSessionRecordDBButler =
-          context.system.actorOf(GameSessionRecordButlerActor(dbConnectionString, context.dispatcher))
+                                  val maxGameSessionLifetime: FiniteDuration
+                           ) extends LoggingFSM [HuddleGameSessionState, HuddleGameFSMData] with ActorLogging {
 
   val redisButler = new RedisButlerGameSessionRecording(redisHost, redisPort)
 
@@ -39,182 +28,239 @@ class GameSessionStateHolderActor(val cleanDataOnExit: Boolean,
   // the Actor is destroyed.
   val gameNeverStartedIndicator = context.system.scheduler.scheduleOnce(this.maxGameSessionLifetime, self, HuddleGame.EvGameShouldHaveStartedByNow)
 
-   //var gameSessionMaxTimeIsUpIndicator: Cancellable =  //context.system.scheduler.scheduleOnce(this.maxGameSessionLifetime, self, HuddleGame.EvGameShouldHaveStartedByNow)
-
    startWith(GameSessionYetToStartState, DataToBeginWith)
 
-   when (HuddleGame.GameSessionYetToStartState, this.maxGameSessionLifetime) {
+   when (HuddleGame.GameSessionYetToStartState) {
 
      case Event(gameInitiated: HuddleGame.EvInitiated, _) =>
 
           this.gameNeverStartedIndicator.cancel
-          sender ! redisButler.recordInitiationOfTheGame(gameInitiated.startedAt, gameInitiated.gameSession)
+          sender ! redisButler.recordInitiationOfTheGame(gameInitiated.startedAt, seededWithSession).details
 
           // We need to set up a separate timer, to indicate when the maximum time for this session is up
           context.system.scheduler.scheduleOnce(this.maxGameSessionLifetime, self, HuddleGame.EvGameShouldHaveEndedByNow)
-          goto (HuddleGame.GameSessionIsBeingPreparedState) using DataToCleanUpRedis(gameInitiated.gameSession)
+          goto (HuddleGame.GameSessionIsBeingPreparedState) // using DataToEndWith(gameInitiated.gameSession)
 
      case Event(HuddleGame.EvGameShouldHaveStartedByNow, _ ) =>
 
-       redisButler.recordEndOfTheGame(System.currentTimeMillis, GameSessionCreatedButNotStarted, -1, seededWithSession)
-       self ! HuddleGame.EvCleanUpRequired (seededWithSession)
+       val sessionEndsAt = System.currentTimeMillis
+       redisButler.recordEndOfTheGame(sessionEndsAt, GameSessionCreatedButNotStarted, -1, seededWithSession)
+       log.info(s"GameSession = ${seededWithSession.gameSessionUUID}, not started after ${maxGameSessionLifetime} seconds, preparing for termination.")
+       context.parent ! HuddleGame.EvEndedByTimeout(sessionEndsAt)
+       self ! HuddleGame.EvSessionCleanupIndicated(sessionEndsAt,GameSessionCreatedButNotStarted)
        goto (HuddleGame.GameSessionIsWrappingUpState)
 
    }
 
-   when (HuddleGame.GameSessionIsBeingPreparedState, this.maxGameSessionLifetime) {
+   when (HuddleGame.GameSessionIsBeingPreparedState) {
 
      case Event(setOfQuestions: EvQuizIsFinalized, _)   =>
 
-       sender ! redisButler.recordPreparationOfTheGame(setOfQuestions.finalizedAt, setOfQuestions.questionMetadata, setOfQuestions.gameSession)
+       sender ! redisButler.recordPreparationOfTheGame(
+                               setOfQuestions.finalizedAt,
+                               setOfQuestions.questionMetadata,
+                               seededWithSession
+                             ).details
        goto (HuddleGame.GameSessionHasStartedState)
 
-     case Event(StateTimeout, sessionReqdForCleaningUp:DataToCleanUpRedis)  =>
-
-       redisButler.recordEndOfTheGame(System.currentTimeMillis, GameSessionEndedByTimeOut, -1, sessionReqdForCleaningUp.gameSession)
-       self ! HuddleGame.EvCleanUpRequired (sessionReqdForCleaningUp.gameSession)
-       goto (HuddleGame.GameSessionIsWrappingUpState)
    }
 
-   when (HuddleGame.GameSessionHasStartedState, this.maxGameSessionLifetime) {
+   when (HuddleGame.GameSessionHasStartedState) {
 
      case Event(questionAnswered: HuddleGame.EvQuestionAnswered, _) =>
 
        sender ! redisButler.recordThatAQuestionIsAnswered(
                       questionAnswered.receivedAt,
                       questionAnswered.questionAndAnswer,
-                      questionAnswered.gameSession
-                )
+                      seededWithSession
+                ).details
        goto (HuddleGame.GameSessionIsContinuingState)
 
      case Event(aboutToPlayClip: HuddleGame.EvPlayingClip, _)  =>
 
-       sender ! redisButler.recordThatClipIsPlayed(aboutToPlayClip.beganPlayingAt, aboutToPlayClip.clipName, aboutToPlayClip.gameSession)
+       sender ! redisButler.recordThatClipIsPlayed(aboutToPlayClip.beganPlayingAt, aboutToPlayClip.clipName, seededWithSession).details
        goto (HuddleGame.GameSessionIsContinuingState)
 
      case Event(paused: HuddleGame.EvPaused, _)                     =>
 
-       sender ! redisButler.recordAPauseOfTheGame(paused.pausedAt, paused.gameSession)
+       sender ! redisButler.recordAPauseOfTheGame(paused.pausedAt, seededWithSession).details
        goto (HuddleGame.GameSessionIsPausedState)
 
-     case Event(ended: HuddleGame.EvEnded, _)                     =>
+     case Event(ended: HuddleGame.EvEndedByPlayer, _)           =>
 
-       sender ! redisButler.recordEndOfTheGame(ended.endedAt, ended.endedBy, ended.totalTimeTakenByPlayer, ended.gameSession)
-       goto (HuddleGame.GameSessionIsWrappingUpState)
-
-     case Event(StateTimeout, sessionReqdForCleaningUp:DataToCleanUpRedis)  =>
-       redisButler.recordEndOfTheGame(System.currentTimeMillis, GameSessionEndedByTimeOut, -1, sessionReqdForCleaningUp.gameSession)
-       self ! HuddleGame.EvCleanUpRequired (sessionReqdForCleaningUp.gameSession)
+       sender ! redisButler.recordEndOfTheGame(
+                               ended.endedAt,
+                               ended.reasonWhySessionEnds,
+                               ended.totalTimeTakenByPlayer,
+                               seededWithSession
+                             ).details
+       self ! HuddleGame.EvSessionCleanupIndicated(ended.endedAt, ended.reasonWhySessionEnds)
        goto (HuddleGame.GameSessionIsWrappingUpState)
 
    }
 
-   when (HuddleGame.GameSessionIsContinuingState, this.maxGameSessionLifetime)  {
+   when (HuddleGame.GameSessionIsContinuingState)  {
 
      case Event(questionAnswered: HuddleGame.EvQuestionAnswered, _) =>
+
+       printf(s" ***Sender ${sender}")
        sender ! redisButler.recordThatAQuestionIsAnswered(
          questionAnswered.receivedAt,
          questionAnswered.questionAndAnswer,
-         questionAnswered.gameSession
-       )
+         seededWithSession
+       ).details
+
        stay
 
      case Event(aboutToPlayClip: HuddleGame.EvPlayingClip, _)  =>
 
-       sender ! redisButler.recordThatClipIsPlayed(aboutToPlayClip.beganPlayingAt, aboutToPlayClip.clipName, aboutToPlayClip.gameSession)
+       sender ! redisButler.recordThatClipIsPlayed(
+                             aboutToPlayClip.beganPlayingAt,
+                             aboutToPlayClip.clipName,
+                             seededWithSession
+                           ).details
        goto (HuddleGame.GameSessionIsContinuingState)
 
-     case Event(paused: HuddleGame.EvPaused, _)                     =>
+     case Event(paused: HuddleGame.EvPaused, _)          =>
 
-       sender ! redisButler.recordAPauseOfTheGame(paused.pausedAt, paused.gameSession)
+       sender ! redisButler.recordAPauseOfTheGame(paused.pausedAt, seededWithSession).details
        goto (HuddleGame.GameSessionIsPausedState)
 
-     case Event(ended: HuddleGame.EvEnded, _)                     =>
+     case Event(ended: HuddleGame.EvEndedByPlayer, _)    =>
 
-       sender ! redisButler.recordEndOfTheGame(ended.endedAt, ended.endedBy, ended.totalTimeTakenByPlayer, ended.gameSession)
-       self ! HuddleGame.EvCleanUpRequired (ended.gameSession)
+       sender ! redisButler.recordEndOfTheGame(
+                             ended.endedAt,
+                             ended.reasonWhySessionEnds,
+                             ended.totalTimeTakenByPlayer,
+                             seededWithSession
+                           ).details
+       self ! HuddleGame.EvSessionCleanupIndicated(ended.endedAt, ended.reasonWhySessionEnds)
        goto (HuddleGame.GameSessionIsWrappingUpState)
-
-     case Event(StateTimeout, sessionReqdForCleaningUp:DataToCleanUpRedis)  =>
-       redisButler.recordEndOfTheGame(System.currentTimeMillis, GameSessionEndedByTimeOut, -1, sessionReqdForCleaningUp.gameSession)
-       self ! HuddleGame.EvCleanUpRequired (sessionReqdForCleaningUp.gameSession)
-       goto (HuddleGame.GameSessionIsWrappingUpState)
-
    }
 
-   when (HuddleGame.GameSessionIsPausedState, this.maxGameSessionLifetime)  {
+   when (HuddleGame.GameSessionIsPausedState)  {
 
       case Event(questionAnswered: HuddleGame.EvQuestionAnswered, _) =>
+
         sender ! redisButler.recordThatAQuestionIsAnswered(
           questionAnswered.receivedAt,
           questionAnswered.questionAndAnswer,
-          questionAnswered.gameSession
-        )
+          seededWithSession
+        ).details
         goto (HuddleGame.GameSessionIsContinuingState)
 
       case Event(aboutToPlayClip: HuddleGame.EvPlayingClip, _)  =>
 
-        sender ! redisButler.recordThatClipIsPlayed(aboutToPlayClip.beganPlayingAt, aboutToPlayClip.clipName, aboutToPlayClip.gameSession)
+        sender ! redisButler.recordThatClipIsPlayed(aboutToPlayClip.beganPlayingAt, aboutToPlayClip.clipName, seededWithSession).details
         goto (HuddleGame.GameSessionIsContinuingState)
 
-      case Event(ended: HuddleGame.EvEnded, _)                     =>
+      case Event(ended: HuddleGame.EvEndedByPlayer, _)                     =>
 
-        sender ! redisButler.recordEndOfTheGame(ended.endedAt, ended.endedBy, ended.totalTimeTakenByPlayer, ended.gameSession)
-        self ! HuddleGame.EvCleanUpRequired (ended.gameSession)
+        log.debug(s"EndedByPlayer ${ended.reasonWhySessionEnds} ....")
+        sender ! redisButler.recordEndOfTheGame(
+                                ended.endedAt,
+                                ended.reasonWhySessionEnds,
+                                ended.totalTimeTakenByPlayer,
+                                seededWithSession
+                             ).details
+        self ! HuddleGame.EvSessionCleanupIndicated(ended.endedAt, ended.reasonWhySessionEnds)
         goto (HuddleGame.GameSessionIsWrappingUpState)
-
-      case Event(StateTimeout, sessionReqdForCleaningUp:DataToCleanUpRedis)  =>
-
-        redisButler.recordEndOfTheGame(System.currentTimeMillis, GameSessionEndedByTimeOut, -1, sessionReqdForCleaningUp.gameSession)
-        self ! HuddleGame.EvCleanUpRequired (sessionReqdForCleaningUp.gameSession)
-        goto (HuddleGame.GameSessionIsWrappingUpState)
-
     }
 
    when (HuddleGame.GameSessionIsWrappingUpState) {
 
-      case Event(cleanUp: HuddleGame.EvCleanUpRequired, _) =>
+      case Event(cleanUpRequired: EvSessionCleanupIndicated, _) =>
 
-        val p = prepareGameSessionForDB()
+        val entireGameSessionRecord = redisButler.retrieveSessionHistory(seededWithSession,"SessionHistory")
 
-        val currentRecord = redisButler.extractCurrentGamePlayRecord(cleanUp.gameSession)
-        this.sessionCompletionEvReceiverActor ! EmittedWhenGameSessionIsFinished(currentRecord.details)
+        val totalScoreAndTime = (entireGameSessionRecord.elems.foldLeft((0,0)){ (accumulator,nextElem) =>
 
-        //TODO: Replace the if-check below, with a HOF
-         if (!this.cleanDataOnExit) redisButler.removeGameSessionFromREDIS(cleanUp.gameSession)
-         stop(FSM.Normal, DataToCleanUpRedis(cleanUp.gameSession))
-    }
+              val (scoreForQ,timeTakenForQ) =
+
+                      nextElem match {
+
+                        case GamePlayedTupleInREDIS(t,qNa) =>
+                                (if (qNa.isCorrect) qNa.points else 0, qNa.timeTakenToAnswerAtFE)
+                        case _   =>
+                                (0,0)
+
+                      }
+
+          (accumulator._1 + scoreForQ, accumulator._2 + timeTakenForQ)
+        })
+
+        val sessionEndedAtTimezoneApplied =
+          Instant.ofEpochMilli(cleanUpRequired.endedAt).atZone(ZoneId.of(seededWithSession.playedInTimezone))
+
+        printf(s" *** Parent ${context.parent}")
+        // parent == custodian of this state-holder
+        context.parent ! EvGameFinishedAndScored(
+                            ComputedGameSession(
+                                seededWithSession.companyID,
+                                seededWithSession.departmentID,
+                                seededWithSession.playerID,
+                                seededWithSession.gameID,
+                                seededWithSession.gameType,
+                                seededWithSession.gameSessionUUID,
+                                seededWithSession.groupID,
+                                sessionEndedAtTimezoneApplied,
+                                seededWithSession.playedInTimezone,
+                                totalScoreAndTime._1,
+                                totalScoreAndTime._2,
+                                cleanUpRequired.endingReason.toString
+
+                            ))
+
+        goto (HuddleGame.GameSessionIsWaitingForInstructionToClose)
+
+   }
+
+   when (HuddleGame.GameSessionIsWaitingForInstructionToClose) {
+
+     case Event(HuddleGame.EvGameSessionTerminationIndicated,_) =>
+         //TODO: Replace the if-check below, with a HOF
+         if (!this.cleanDataOnExit) redisButler.removeGameSessionFromREDIS(seededWithSession)
+         stop(FSM.Normal, DataToEndWith(System.currentTimeMillis()))
+
+     case m: Any => log.info(s"Unknown message $m, received while waiting for instruction to close.")
+                    stay
+   }
 
   whenUnhandled {
+
 
     case Event(m, d) =>
 
       m match  {
 
-        case EvGamePlayRecordSoFarRequired(gameSession) =>
-             sender ! redisButler.extractCurrentGamePlayRecord(gameSession)
+        case EvGamePlayRecordSoFarRequired =>
+          sender ! redisButler.extractCurrentGamePlayRecord(seededWithSession).details
           stay
 
-        case EvForceEndedByManager(t,e,n,g) =>
+        case m:EvForceEndedByManager =>
 
-          val hasEndedSuccessfully = redisButler.recordEndOfTheGame(t, GameSessionEndedByManager, -1, g)
+          val endAction = redisButler.recordEndOfTheGame(m.endedAt, m.reasonWhySessionEnds, -1, seededWithSession)
 
-          if (hasEndedSuccessfully.details == "Ended") {
-            log.info(s"GameSession ($g), forced to end by manager ($n), at ($t)")
-            sender ! hasEndedSuccessfully
-            self ! EvCleanUpRequired(g)
+          if (endAction.details == "Ended") {
+            log.info(s"GameSession ($seededWithSession), at ${m.endedAt}, forced to end by manager ${m.managerName}")
+            sender ! endAction.details
+            self ! EvSessionCleanupIndicated(m.endedAt,GameSessionEndedByManager)
             goto (GameSessionIsWrappingUpState)
           }
           else {
-            log.info(s"GameSession ($g), failed to end by manager ($n), at ($t)")
-            sender ! hasEndedSuccessfully
+            log.info(s"GameSession ($seededWithSession), at (${m.endedAt}), failed to end, was instructed by manager (${m.managerName})")
+            sender ! endAction.details
             stay
           }
 
         case EvGameShouldHaveEndedByNow =>
 
-          redisButler.recordEndOfTheGame(System.currentTimeMillis, GameSessionEndedByTimeOut, -1, seededWithSession)
-          self ! HuddleGame.EvCleanUpRequired (seededWithSession)
+          val sessionEndsAt = System.currentTimeMillis
+          redisButler.recordEndOfTheGame(sessionEndsAt, GameSessionEndedByTimeOut, -1, seededWithSession)
+
+          // parent == custodian of this state-holder
+          context.parent ! EvEndedByTimeout(sessionEndsAt)
+          self ! HuddleGame.EvSessionCleanupIndicated(sessionEndsAt,GameSessionEndedByTimeOut)
           goto (HuddleGame.GameSessionIsWrappingUpState)
 
         case _  =>
@@ -222,24 +268,28 @@ class GameSessionStateHolderActor(val cleanDataOnExit: Boolean,
           stay
       }
 
+    case m: Any => log.info(s"Unknown message of type ${m.getClass}, in ${this.stateName}")
+      stay
+
 
   }
-
   onTransition {
 
     case HuddleGame.GameSessionYetToStartState -> HuddleGame.GameSessionHasStartedState =>
-      log.info("Transition from GameYetToStart GameHasStarted")
+      log.info("Transition from GameYetToStart to GameHasStarted")
   }
 
   onTermination {
     case StopEvent(FSM.Normal, state, data) =>
-      log.info(s"Game ${data.asInstanceOf[HuddleGame.DataToCleanUpRedis].gameSession}, is finished.")
+      this.redisButler.releaseConnection
+      log.info(s"GameSession ${seededWithSession}, now rests in peace.")
   }
 
   override def postStop(): Unit = {
     super.postStop()
-    this.redisButler.releaseConnection
+
   }
+
 }
 
 object GameSessionStateHolderActor {
@@ -247,8 +297,7 @@ object GameSessionStateHolderActor {
             sessionID: GameSession,
             redisHost: String,
             redisPort: Int,
-            maxGameTimeOut: FiniteDuration,
-            sessionCompletionEvReceiver: ActorRef
+            mxTTLGameSession: FiniteDuration
            ): Props =
-    Props(new GameSessionStateHolderActor(shouldCleanUpREDIS, sessionID, redisHost, redisPort, maxGameTimeOut,sessionCompletionEvReceiver))
+    Props(new GameSessionStateHolderActor(shouldCleanUpREDIS, sessionID, redisHost, redisPort, mxTTLGameSession))
 }

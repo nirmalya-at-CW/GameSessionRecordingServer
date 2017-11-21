@@ -1,4 +1,4 @@
-package org.nirmalya.experiment
+package org.nirmalya.experiment.test
 
 import akka.actor.ActorSystem
 import akka.testkit.{EventFilter, TestKit}

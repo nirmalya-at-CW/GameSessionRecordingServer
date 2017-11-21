@@ -35,6 +35,8 @@
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="SBT: de.heikoseeberger:akka-http-json4s_2.11:1.16.0:jar" level="project" />
+    <orderEntry type="library" name="SBT: org.mariadb.jdbc:mariadb-java-client:2.2.0:jar" level="project" />
+    <orderEntry type="library" name="SBT: com.typesafe.akka:akka-slf4j_2.11:2.5.2:jar" level="project" />
     <orderEntry type="library" name="SBT: org.jooq:jooq-scala:3.9.6:jar" level="project" />
     <orderEntry type="library" name="SBT: org.jooq:jooq-meta:3.10.0:jar" level="project" />
     <orderEntry type="library" name="SBT: org.jooq:jooq-codegen:3.10.0:jar" level="project" />
@@ -46,7 +48,6 @@
     <orderEntry type="library" name="SBT: io.kamon:kamon-scala_2.11:0.6.7:jar" level="project" />
     <orderEntry type="library" name="SBT: io.kamon:kamon-core_2.11:0.6.7:jar" level="project" />
     <orderEntry type="library" name="SBT: io.kamon:kamon-akka-2.4_2.11:0.6.8:jar" level="project" />
-    <orderEntry type="library" name="SBT: org.slf4j:slf4j-api:1.7.20:jar" level="project" />
     <orderEntry type="library" name="SBT: org.scala-lang:scala-reflect:2.11.11:jar" level="project" />
     <orderEntry type="library" name="SBT: org.scala-lang:scala-library:2.11.11:jar" level="project" />
     <orderEntry type="library" name="SBT: ch.qos.logback:logback-core:1.1.7:jar" level="project" />
@@ -101,6 +102,6 @@
     <orderEntry type="library" scope="TEST" name="SBT: org.scala-sbt:test-interface:1.0:jar" level="project" />
     <orderEntry type="library" name="SBT: com.typesafe.akka:akka-actor_2.11:2.5.2:jar" level="project" />
     <orderEntry type="library" name="SBT: org.aspectj:aspectjrt:1.8.2:jar" level="project" />
-    <orderEntry type="library" name="SBT: org.mariadb.jdbc:mariadb-java-client:2.1.2:jar" level="project" />
+    <orderEntry type="library" name="SBT: org.slf4j:slf4j-api:1.7.25:jar" level="project" />
   </component>
 </module>

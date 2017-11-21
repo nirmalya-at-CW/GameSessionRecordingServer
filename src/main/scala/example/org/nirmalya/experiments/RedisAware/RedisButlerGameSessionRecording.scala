@@ -3,7 +3,9 @@ package example.org.nirmalya.experiments.RedisAware
 import akka.actor.{Actor, ActorLogging, Props}
 import com.mashape.unirest.http.Unirest
 import com.redis.RedisClient
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.{CompleteGamePlaySessionHistory, EmittedWhenGameSessionIsFinished, FailedRedisSessionStatus, GameClipRunInREDIS, GameCreatedTupleInREDIS, GameEndedTupleInREDIS, GameInfoTupleInREDIS, GameInitiatedTupleInREDIS, GamePausedTupleInREDIS, GamePlayedTupleInREDIS, GamePreparedTupleInREDIS, GameSession, GameSessionEndingReason, NonExistingCompleteGamePlaySessionHistory, OKRedisSessionStatus, QuestionAnswerTuple, RecordingStatus, RedisSessionStatus}
+import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.{CompleteGamePlaySessionHistory, FailedRedisSessionStatus, GameClipRunInREDIS, GameCreatedTupleInREDIS, GameEndedTupleInREDIS, GameInfoTupleInREDIS, GameInitiatedTupleInREDIS, GamePausedTupleInREDIS, GamePlayedTupleInREDIS, GamePreparedTupleInREDIS, GameSession, GameSessionEndingReason, HuddleGame, NonExistingCompleteGamePlaySessionHistory, OKRedisSessionStatus, QuestionAnswerTuple, RedisRecordingStatus, RedisSessionStatus, formats_2}
+import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.HuddleGame.EvGamePlayRecordSoFarRequired
+import org.json4s._
 import org.json4s.native.JsonMethods._
 import org.json4s.native.Serialization._
 import org.slf4j.LoggerFactory
@@ -60,11 +62,11 @@ class RedisButlerGameSessionRecording(redisHost: String, redisPort: Int) {
   }
 
   def
-  extractCurrentGamePlayRecord (gameSession: GameSession): RecordingStatus = {
+  extractCurrentGamePlayRecord (gameSession: GameSession): RedisRecordingStatus = {
 
     val gamePlayRecord = this.redisClient.hget(gameSession, "SessionHistory")
 
-    RecordingStatus(
+    RedisRecordingStatus(
       gamePlayRecord match {
 
         case Some(retrievedRec)  =>
@@ -77,9 +79,9 @@ class RedisButlerGameSessionRecording(redisHost: String, redisPort: Int) {
     )
   }
   def
-  removeGameSessionFromREDIS (gameSession: GameSession): RecordingStatus = {
+  removeGameSessionFromREDIS (gameSession: GameSession): RedisRecordingStatus = {
 
-    RecordingStatus(
+    RedisRecordingStatus(
       this.redisClient.del(gameSession) match {
 
         case Some(n) =>
@@ -95,8 +97,8 @@ class RedisButlerGameSessionRecording(redisHost: String, redisPort: Int) {
   def
   recordEndOfTheGame(
         atServerClockTime: Long, endedHow: GameSessionEndingReason, totalTimeTakenByPlayer: Int, gameSession: GameSession
-  ): RecordingStatus = {
-    RecordingStatus (
+  ): RedisRecordingStatus = {
+    RedisRecordingStatus (
       storeSessionHistory(gameSession,GameEndedTupleInREDIS(atServerClockTime, endedHow.toString,totalTimeTakenByPlayer )) match {
 
         case f: FailedRedisSessionStatus =>
@@ -110,8 +112,8 @@ class RedisButlerGameSessionRecording(redisHost: String, redisPort: Int) {
   }
 
   def recordAPauseOfTheGame(
-        atServerClockTime: Long, gameSession: GameSession): RecordingStatus = {
-    RecordingStatus (
+        atServerClockTime: Long, gameSession: GameSession): RedisRecordingStatus = {
+    RedisRecordingStatus (
       storeSessionHistory(gameSession,GamePausedTupleInREDIS(atServerClockTime)) match {
 
         case f: FailedRedisSessionStatus =>
@@ -126,11 +128,11 @@ class RedisButlerGameSessionRecording(redisHost: String, redisPort: Int) {
 
   def
   recordThatAQuestionIsAnswered(
-        atServerClockTime: Long, questionNAnswer: QuestionAnswerTuple, gameSession: GameSession): RecordingStatus = {
+        atServerClockTime: Long, questionNAnswer: QuestionAnswerTuple, gameSession: GameSession): RedisRecordingStatus = {
 
     // val playTuple = GamePlayTuple(atServerClockTime,questionNAnswer)
 
-    RecordingStatus (
+    RedisRecordingStatus (
       storeSessionHistory(gameSession,GamePlayedTupleInREDIS(atServerClockTime,questionNAnswer)) match {
 
         case f: FailedRedisSessionStatus =>
@@ -143,9 +145,9 @@ class RedisButlerGameSessionRecording(redisHost: String, redisPort: Int) {
     )
   }
 
-  def recordThatClipIsPlayed(atServerClockTime: Long, clipName: String, gameSession: GameSession): RecordingStatus = {
+  def recordThatClipIsPlayed(atServerClockTime: Long, clipName: String, gameSession: GameSession): RedisRecordingStatus = {
 
-    RecordingStatus (
+    RedisRecordingStatus (
       storeSessionHistory(gameSession,GameClipRunInREDIS(atServerClockTime,clipName)) match {
 
         case f: FailedRedisSessionStatus =>
@@ -159,7 +161,7 @@ class RedisButlerGameSessionRecording(redisHost: String, redisPort: Int) {
   }
 
   def
-  recordInitiationOfTheGame(atServerClockTime: Long, gameSession: GameSession): RecordingStatus = {
+  recordInitiationOfTheGame(atServerClockTime: Long, gameSession: GameSession): RedisRecordingStatus = {
 
     // TODO: Handle this during transition from YetToStart to Started
     // val createdTuple = write[GameCreatedTuple](GameCreatedTuple("Game Sentinel"))
@@ -169,7 +171,7 @@ class RedisButlerGameSessionRecording(redisHost: String, redisPort: Int) {
     )
     this.redisClient.hset(gameSession, "SessionHistory", completeSessionSoFar)
 
-    RecordingStatus (
+    RedisRecordingStatus (
       storeSessionHistory(gameSession,GameInitiatedTupleInREDIS(atServerClockTime)) match {
 
         case f: FailedRedisSessionStatus =>
@@ -183,9 +185,9 @@ class RedisButlerGameSessionRecording(redisHost: String, redisPort: Int) {
   }
 
   def
-  recordPreparationOfTheGame (atServerClockTime: Long, questionMetadata: String, gameSession: GameSession): RecordingStatus = {
+  recordPreparationOfTheGame (atServerClockTime: Long, questionMetadata: String, gameSession: GameSession): RedisRecordingStatus = {
 
-    RecordingStatus (
+    RedisRecordingStatus (
       storeSessionHistory(gameSession,GamePreparedTupleInREDIS(atServerClockTime,questionMetadata)) match {
 
         case f: FailedRedisSessionStatus =>

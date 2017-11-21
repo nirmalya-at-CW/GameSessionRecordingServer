@@ -1,5 +1,6 @@
 package example.org.nirmalya.experiments
 
+import java.time.{LocalDateTime, ZonedDateTime}
 import java.util.UUID
 
 import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.ExternalAPIParams.{REQStartAGameWith, RESPGameSessionBody}
@@ -17,14 +18,15 @@ object GameSessionHandlingServiceProtocol {
 
   object ExternalAPIParams {
 
-    case class REQStartAGameWith(companyID: String, departmentID: String, gameID: String, playerID: String,  companyName: String,  manager: String, gameName: String, gameSessionUUID: String) {
+    case class REQStartAGameWith(
+                  companyID: String, departmentID: String, gameID: String,
+                  playerID: String,  gameType: String, groupID: Option[String] = None,
+                  gameName: String, gameSessionUUID: String, playedInTimezone: String) {
       override def toString =
         new StringBuffer().append(companyID)      .append(".")
                           .append(departmentID)   .append(".")
                           .append(gameID)         .append(".")
                           .append(playerID)       .append(".")
-                          .append(companyName)    .append(".")
-                          .append(manager)        .append(".")
                           .append(gameName)       .append(".")
                           .append(gameSessionUUID)
         .toString
@@ -40,7 +42,10 @@ object GameSessionHandlingServiceProtocol {
 
     case class ExpandedMessage (successId: Int, description: String)
     case class Supplementary(dataCarried: Map[String,String])
-    case class RESPGameSessionBody(opSuccess: Boolean, message: ExpandedMessage, contents: Option[Map[String,String]]=None)
+
+    sealed trait RESPGameSessionBody { val opSuccess: Boolean }
+    case class RESPGameSessionBodyWhenSuccessful(message: ExpandedMessage, contents: Option[Map[String,String]]=None, opSuccess: Boolean = true) extends RESPGameSessionBody
+    case class RESPGameSessionBodyWhenFailed(message: ExpandedMessage, contents: Option[Map[String,String]]=None, opSuccess: Boolean = false) extends RESPGameSessionBody
   }
 
   sealed trait GameSessionEndingReason
@@ -50,7 +55,7 @@ object GameSessionHandlingServiceProtocol {
   case object  GameSessionEndedByManager extends GameSessionEndingReason
 
 
-  case class GameKey(companyID: String, departmentID: String, gameID: String, playerID: String) {
+  case class GameSessionCompositeID(companyID: String, departmentID: String, gameID: String, playerID: String) {
     override def toString =
       new StringBuffer().append(companyID)      .append(".")
                         .append(departmentID)   .append(".")
@@ -60,11 +65,43 @@ object GameSessionHandlingServiceProtocol {
   }
   case class QuestionAnswerTuple(questionID: Int, answerID: Int, isCorrect: Boolean, points: Int, timeTakenToAnswerAtFE: Int)
 
-  case class GameSession(companyID: String, departmentID: String, gameID: String, playerID: String,  gameName: String, gameSessionUUID: String) {
+  case class GameSession(companyID: String, departmentID: String, gameID: String, playerID: String,
+                         gameName: String, gameSessionUUID: String, groupID: String = "NOTSET", gameType: String = "SP",
+                         playedInTimezone: String
+                        ) {
 
-    val gameKey = GameKey(companyID,departmentID,gameID,playerID)
-    override def toString = new StringBuffer().append(gameKey.toString).append(".").append(gameSessionUUID).toString
+    val gameSessionKey = gameSessionUUID
+    override def toString = new StringBuffer().append(companyID)      .append(".")
+                                              .append(departmentID)   .append(".")
+                                              .append(gameID)         .append(".")
+                                              .append(gameType)       .append(".")
+                                              .append(playerID)       .append(".")
+                                              .append(gameSessionUUID)
+                                              .toString
   }
+
+
+
+  case class ComputedGameSession (
+               companyID: String, departmentID: String, playerID: String, gameID: String,
+               gameType: String = "SP", gameSessionUUID: String, groupID: String,
+               completedAt: ZonedDateTime, timezoneApplicable: String,
+               totalPointsObtained: Int, timeTakenToFinish: Int, endedBecauseOf: String
+             )
+
+  case class LeaderboardConsumableData(
+               companyID: String, departmentID: String, gameID: String, playerID: String,
+               groupID: String, gameSessionUUID: String, score: Int
+             )
+
+  case class PlayerPerformanceRecordSP(
+                companyID: String, belongsToDepartment: String, playerID: String, gameID: String,
+                lastPlayedOn: ZonedDateTime, timezoneApplicable: String, pointsObtained: Int, timeTaken: Int)
+
+  case class PlayerPerformanceRecordMP(
+                companyID: String, belongsToDepartment: String, playerID: String, gameID: String,
+                lastPlayedOn: ZonedDateTime, timezoneApplicable: String, pointsObtained: Int, timeTaken: Int, winsAchieved: Int)
+
 
 
   sealed trait GameInfoTupleInREDIS
@@ -91,9 +128,9 @@ object GameSessionHandlingServiceProtocol {
         classOf[QuestionAnswerTuple],
         classOf[GameEndedTupleInREDIS],
         classOf[GamePreparedTupleInREDIS],
-        classOf[GameKey],
+        classOf[GameSessionCompositeID],
         classOf[REQStartAGameWith],
-        classOf[RecordingStatus],
+        classOf[RedisRecordingStatus],
         classOf[RESPGameSessionBody]
       )
     )
@@ -103,42 +140,82 @@ object GameSessionHandlingServiceProtocol {
 
     sealed trait HuddleGameFSMData
     case object DataToBeginWith extends  HuddleGameFSMData  // Not used at this point in time
-    case class  DataToCleanUpRedis(gameSession: GameSession) extends HuddleGameFSMData
+    case class  DataToEndWith(sessionEndedAt: Long) extends HuddleGameFSMData
 
+    sealed trait HuddleGameSessionTerminationEvent { val reasonWhySessionEnds: GameSessionEndingReason }
     sealed trait HuddleGameEvent
 
-    case class EvCreated(gameSession: GameSession) extends HuddleGameEvent
-    case class EvInitiated(startedAt: Long, gameSession: GameSession) extends  HuddleGameEvent
-    case class EvQuizIsFinalized(finalizedAt: Long, questionMetadata: String, gameSession: GameSession) extends  HuddleGameEvent
-    case class EvPlayingClip(beganPlayingAt: Long, clipName: String, gameSession: GameSession) extends HuddleGameEvent
-    case class EvQuestionAnswered(receivedAt: Long, questionAndAnswer:QuestionAnswerTuple, gameSession: GameSession) extends HuddleGameEvent
-    case class EvPaused(pausedAt: Long, gameSession: GameSession) extends HuddleGameEvent
-    case class EvEnded(endedAt: Long, endedBy: GameSessionEndingReason = GameSessionEndedByPlayer, totalTimeTakenByPlayer: Int, gameSession: GameSession) extends HuddleGameEvent
-    case class EvForceEndedByManager(endedAt: Long, endedBy: GameSessionEndingReason = GameSessionEndedByPlayer, managerName: String, gameSession: GameSession) extends HuddleGameEvent
-    case class EvCleanUpRequired(gameSession: GameSession) extends HuddleGameEvent
-    case class EvGamePlayRecordSoFarRequired(gameSession: GameSession) extends HuddleGameEvent
-    case object EvGameShouldHaveStartedByNow extends HuddleGameEvent
-    case object EvGameShouldHaveEndedByNow   extends HuddleGameEvent
+    case class   EvCreated(gameSession: GameSession) extends HuddleGameEvent
+    case class   EvInitiated(startedAt: Long) extends  HuddleGameEvent
+    case class   EvQuizIsFinalized(finalizedAt: Long, questionMetadata: String ) extends  HuddleGameEvent
+    case class   EvPlayingClip(beganPlayingAt: Long, clipName: String) extends HuddleGameEvent
+    case class   EvQuestionAnswered(receivedAt: Long, questionAndAnswer:QuestionAnswerTuple) extends HuddleGameEvent
+    case class   EvPaused(pausedAt: Long) extends HuddleGameEvent
+    case class   EvEndedByPlayer(endedAt: Long,totalTimeTakenByPlayer: Int) extends HuddleGameEvent with HuddleGameSessionTerminationEvent {
+      val reasonWhySessionEnds = GameSessionEndedByPlayer
+    }
+    case class   EvForceEndedByManager(endedAt: Long,  managerName: String) extends HuddleGameEvent with HuddleGameSessionTerminationEvent {
+      val reasonWhySessionEnds = GameSessionEndedByManager
+    }
+
+    case class   EvEndedByTimeout (endedAt: Long) extends HuddleGameEvent with HuddleGameSessionTerminationEvent {
+      val reasonWhySessionEnds = GameSessionEndedByTimeOut
+    }
+    case class   EvSessionCleanupIndicated(endedAt: Long, endingReason: GameSessionEndingReason) extends HuddleGameEvent
+    case object  EvGamePlayRecordSoFarRequired extends HuddleGameEvent
+    case object  EvGameShouldHaveStartedByNow extends HuddleGameEvent
+    case object  EvGameShouldHaveEndedByNow   extends HuddleGameEvent
+    case class   EvGameFinishedAndScored (computedGameSession: ComputedGameSession) extends HuddleGameEvent
+    case object  EvGameSessionSaved extends HuddleGameEvent
+    case object  EvGameSessionTerminationIndicated extends HuddleGameEvent
+    case object  EvStateHolderIsGoingDown extends HuddleGameEvent
 
 
     sealed trait HuddleGameSessionState
 
-    case object GameSessionYetToStartState      extends HuddleGameSessionState
-    case object GameSessionIsBeingPreparedState extends HuddleGameSessionState
-    case object GameSessionHasStartedState      extends HuddleGameSessionState
-    case object GameSessionIsContinuingState    extends HuddleGameSessionState
-    case object GameSessionIsPausedState        extends HuddleGameSessionState
-    case object GameSessionHasEndedState        extends HuddleGameSessionState
-    case object GameSessionIsWrappingUpState    extends HuddleGameSessionState
+    case object GameSessionYetToStartState                  extends HuddleGameSessionState
+    case object GameSessionIsBeingPreparedState             extends HuddleGameSessionState
+    case object GameSessionHasStartedState                  extends HuddleGameSessionState
+    case object GameSessionIsContinuingState                extends HuddleGameSessionState
+    case object GameSessionIsPausedState                    extends HuddleGameSessionState
+    case object GameSessionHasEndedState                    extends HuddleGameSessionState
+    case object GameSessionIsWrappingUpState                extends HuddleGameSessionState
+    case object GameSessionIsWaitingForInstructionToClose   extends HuddleGameSessionState
 
   }
 
-  case class RecordingStatus(details: String)
+
+  case class RedisRecordingStatus(details: String)
 
   case class EmittedWhenGameSessionIsFinished(contents: String)
+  case object DespatchedToLeaderboardAcknowledgement
 
 
   trait RedisSessionStatus
   case class  FailedRedisSessionStatus(reason: String) extends RedisSessionStatus
   case object OKRedisSessionStatus extends RedisSessionStatus
+
+  object DBHatch {
+
+          case class DBActionGameSessionRecord(
+                  companyID: String, belongsToDepartment: String, playerID: String, gameID: String,
+                  gameSessionUUID: String, belongsToGroup: String, gameType: String = "SP", gameName: String = "NOTSUPPLIED",
+                  lastPlayedOnInUTC: LocalDateTime, timezoneApplicable: String, endReason: String,
+                  score: Int, timeTaken: Int)
+
+
+    case class DBActionPlayerPerformanceRecord(
+                  companyID: String, belongsToDepartment: String, playerID: String, gameID: String,
+                  gameType: String = "SP",
+                  lastPlayedOn: LocalDateTime, timezoneApplicable: String,
+                  pointsObtained: Int, timeTaken: Int, winsAchieved: Int)
+    
+    sealed trait DBAction
+    case class   DBActionInsert(r:DBActionGameSessionRecord) extends DBAction
+    
+    sealed trait DBActionOutcome
+    case class   DBActionInsertSuccess(i: Int)       extends DBActionOutcome
+
+    case class   DBActionInsertFailure(s: String)    extends DBActionOutcome
+  }
 }

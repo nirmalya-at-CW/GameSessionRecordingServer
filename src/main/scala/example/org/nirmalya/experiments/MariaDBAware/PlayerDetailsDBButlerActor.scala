@@ -39,19 +39,7 @@ class PlayerDetailsButlerActor(
 
   override def receive: Receive =  {
 
-    case r: DBActionPlayerToRetrieve =>
-
-      val rows = GameSessionRecordButlerActor
-                 .retrieve(
-                   DriverManager.getConnection(connectionString),
-                   r.companyID,
-                   r.departmentName,
-                   r.playerID
-                 )
-
-      sender ! rows
-
-    case u: DBActionPlayerPerformanceToUpsert   =>
+    case r: DBActionPlayerToRetrieve => // TBD
 
   }
 
@@ -59,9 +47,9 @@ class PlayerDetailsButlerActor(
 
 object PlayerDetailsButlerActor {
 
-  def apply(connectionString: String, dbAccessDispatcher: ExecutionContextExecutor): Props =
+  def apply(dbAccessDispatcher: ExecutionContextExecutor): Props =
 
-             Props(new GameSessionRecordButlerActor(connectionString,dbAccessDispatcher))
+             Props(new GameSessionDBButlerActor(dbAccessDispatcher))
 
   def retrieve(c: Connection, companyName: String, department: String, playerID: String): List[PlayerDetails] = {
 
