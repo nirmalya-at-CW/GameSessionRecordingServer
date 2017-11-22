@@ -6,20 +6,23 @@ import java.util.concurrent.TimeUnit
 
 import akka.actor.ActorSystem
 import akka.testkit.{EventFilter, ImplicitSender, TestKit, TestProbe}
+import com.OneHuddle.GamePlaySessionService.GameSessionCustodianActor
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.DBHatch.DBActionGameSessionRecord
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.ExternalAPIParams.{ExpandedMessage, RESPGameSessionBodyWhenSuccessful}
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.HuddleGame.EvInitiated
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{GameSession, GameSessionEndedByTimeOut, HuddleGame, QuestionAnswerTuple}
+import com.OneHuddle.GamePlaySessionService.MariaDBAware.NonExistentGameSessionRecord
 import com.typesafe.config.ConfigFactory
-import example.org.nirmalya.experiments.GameSessionCustodianActor
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.DBHatch.DBActionGameSessionRecord
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.ExternalAPIParams.{ExpandedMessage, RESPGameSessionBodyWhenSuccessful}
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.HuddleGame.EvInitiated
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.{GameSession, GameSessionEndedByTimeOut, HuddleGame, LeaderboardConsumableData, QuestionAnswerTuple}
-import example.org.nirmalya.experiments.MariaDBAware.NonExistentGameSessionRecord
-import generated.Tables._
+
+import com.OneHuddle.GamePlaySessionService.jOOQ.generated.Tables._
 import org.jooq.SQLDialect
 import org.jooq.impl.DSL
 import org.nirmalya.experiment.test.common._
 import org.scalatest.{BeforeAndAfterAll, MustMatchers, WordSpecLike}
 
-import scala.collection.JavaConverters._
+import collection.JavaConverters._
+
+
 import scala.concurrent.duration.Duration
 
 /**
@@ -115,7 +118,7 @@ class GameSessionCustodianBehaviourTest_2  extends TestKit(ActorSystem(
 
     "correctly deal with timeout when no question answered after the first two" in {
 
-      val gameSessionInfo = GameSession("CW","QA","G01","P01","Tic-Tac-Toe","UUID-2",playedInTimezone = "Asia/Calcutta")
+      val gameSessionInfo = GameSession("CW","QA","G01","P01","Tic-Tac-Toe","UUID-9",playedInTimezone = "Asia/Calcutta")
 
       val gameStartsAt  = System.currentTimeMillis()
       val evInitiated = EvInitiated(gameStartsAt)

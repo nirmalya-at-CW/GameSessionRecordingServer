@@ -1,4 +1,4 @@
-package example.org.nirmalya.experiments
+package com.OneHuddle.GamePlaySessionService
 
 import kamon.Kamon
 

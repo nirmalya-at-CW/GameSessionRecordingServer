@@ -2,7 +2,7 @@ package org.nirmalya.experiment.test.common
 
 import akka.actor.{Actor, ActorLogging, Props}
 import akka.event.LoggingReceive
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.{DespatchedToLeaderboardAcknowledgement, LeaderboardConsumableData}
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{DespatchedToLeaderboardAcknowledgement, LeaderboardConsumableData}
 
 import scala.sys.Prop
 

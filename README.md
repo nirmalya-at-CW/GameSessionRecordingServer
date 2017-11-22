@@ -19,21 +19,48 @@ This service (named GameSessionRecordingServer) is implemented using Akka-HTTP a
 used is Scala (which is almost always easily interoperable with Java). The software is bundled and deployed as 
 a regular Java JAR file.
 
-For every Game Session, an Actor named *GamePlayRecorderActor (org.nirmalya.experiments.GamePlayRecorderActor)* is created automatically. It represents, in 1Huddle's
+
+### Main Actors
+
+#### GameSessionStateHolderActor
+
+For every Game Session, an Actor named [GameSessionStateHolderActor](com.OneHuddle.GamePlaySessionService.GameSessionStateHolderActor) is created automatically. It represents, in 1Huddle's
 backend, the game being played in the real-world. This Actor implements a very small Finite-State-Machine (FSM) and 
 responds to a handful events, viz., EvStarted, EvPaused etc. It also sets up a timer for each Game Session, which is
-fired to indicate a timeout on the part of the Player. 
+fired to indicate a timeout on the part of the Player. It stores the events (in JSON form), in an underlying instance 
+of REDIS. 
 
-Another Actor, named *GameSessionSPOCActor* assumes the role of a gate-keeper. It 
-keeps track of all the *GamePlayRecorderActors* currently alive and forwards requests (API) 
-made from the external world, to the intended recorders.
+#### GameSessionDBButlerActor
+It is responsible for storing information about a completed game-session in an underlying RDBMS (note: this prototype
+uses MariaDB, an open licensed version of MySQL) and retrieving the same. It encapsulates all the SQL and associated 
+details of accessing RDBMS using JDBC. The rest of the application interacts with it through well-defined messages only.
 
-*GameSessionSPOCActor* is initialized (during construction) with a specialized actor, named
-_GameSessionCompletionEmitterActor_. Its job is to call specific (predefined) HTTP endpoints, with the entire
-record of a finished GameSession. A good example of such endpoints is that of a **Leaderboard Calculation Service**.
-Whenever a Game Session is finished, the _GamePlayRecorderActor_ - which is responsible for that session - passes
-the final record to _GameSessionCompletionEmitterActor_. The latter, then contacts the HTTP endpoints mentioned 
-earlier. THe HTTP operation used is **PUT**. 
+#### GameSessionCustodianActor
+Another Actor, named [GameSessionCustodianActor](com.OneHuddle.GamePlaySessionService.GameSessionCustodianActor) assumes the role 
+of a gate-keeper of a specific game-session. In other words, to the external world,the game-session is represented by a 
+GameSessionCustodian. It is responsible for 
+*   managing the state of the session, using a  *GameSessionStateHolderActor*
+*   storing the details of a _completed_ session, using a *GameSessionDBButlerActor*
+*   informing an emitter actor about the final score, computed based on the 'just finished' session (this emitter is 
+responsible for updating an externally running Leaderboard service)
+
+Therefore, for every session that is initiated on 1Huddle platform, we have 
+*   1 GameSessionCustodian
+*   1 GameSessionStateHolder
+*   1 GameSessionDBButler 
+
+#### GameSessionSPOCActor
+ 
+ Its name suggests what it actually is: a Single Point Of Contact ( [SPOC](com.OneHuddle.GamePlaySessionService.GameSessionSPOCActor) ). This actor is 
+ responsible for creating a custodian of a session and then, exchanging appropriate messages with it,
+ while a Player plays and her actions are converted to Events that SPOC understands. A SPOC can hold multiple
+ custodians, each of the latter representing a unique game-session. In that sense, it behaves as a router.
+ 
+#### GameSessionRecordingServer
+
+This is an HTTP Server and API endpoint for all (JSON) messages that carry actions taken
+by a Player. Internally, it holds a SPOC and hands over the messages to it. By itself,
+the Server does not special processing.
 
 A instance of REDIS in-memory database is assumed to be available. Recorder Actors use this for storing all
 session-related transient data.

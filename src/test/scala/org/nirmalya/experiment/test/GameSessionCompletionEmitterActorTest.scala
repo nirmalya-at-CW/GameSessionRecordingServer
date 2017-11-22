@@ -3,8 +3,8 @@ package org.nirmalya.experiment.test
 import akka.actor.ActorSystem
 import akka.testkit.{EventFilter, TestKit}
 import com.typesafe.config.ConfigFactory
-import example.org.nirmalya.experiments.GameSessionCompletionEmitterActor
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.EmittedWhenGameSessionIsFinished
+import com.OneHuddle.GamePlaySessionService.GameSessionCompletionEmitterActor
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.EmittedWhenGameSessionIsFinished
 
 import collection.JavaConversions._
 import org.scalatest.{BeforeAndAfterAll, MustMatchers, WordSpecLike}

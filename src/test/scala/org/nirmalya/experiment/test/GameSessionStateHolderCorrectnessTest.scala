@@ -7,11 +7,11 @@ import akka.actor.FSM.{CurrentState, SubscribeTransitionCallBack, Transition}
 import akka.actor.{ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.ExternalAPIParams.{ExpandedMessage, RESPGameSessionBodyWhenSuccessful}
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.ExternalAPIParams.{ExpandedMessage, RESPGameSessionBodyWhenSuccessful}
 import org.scalatest.{BeforeAndAfterAll, MustMatchers, WordSpecLike}
-import example.org.nirmalya.experiments.GameSessionStateHolderActor
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.{GameSession, GameSessionEndedByManager, HuddleGame, QuestionAnswerTuple}
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.HuddleGame._
+import com.OneHuddle.GamePlaySessionService.GameSessionStateHolderActor
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{GameSession, GameSessionEndedByManager, HuddleGame, QuestionAnswerTuple}
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.HuddleGame._
 import org.nirmalya.experiment.test.common.StopSystemAfterAll
 
 import scala.language.postfixOps

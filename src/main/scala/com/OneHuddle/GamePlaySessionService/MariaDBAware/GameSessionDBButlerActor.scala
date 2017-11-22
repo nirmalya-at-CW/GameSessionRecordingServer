@@ -1,19 +1,20 @@
-package example.org.nirmalya.experiments.MariaDBAware
+package com.OneHuddle.GamePlaySessionService.MariaDBAware
 
 import java.sql.{Connection, DriverManager, Timestamp}
 
 
 import akka.actor.{Actor, ActorLogging, Props}
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.DBHatch._
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.DBHatch._
 import org.jooq.SQLDialect
 import org.jooq.impl.DSL
-import generated.Tables._
+import com.OneHuddle.GamePlaySessionService.jOOQ.generated.Tables._
 
-import collection.JavaConverters._
+
 import java.time._
 
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.ComputedGameSession
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.ComputedGameSession
 
+import collection.JavaConverters._
 import scala.concurrent.ExecutionContextExecutor
 
 

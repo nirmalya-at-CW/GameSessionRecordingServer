@@ -7,13 +7,15 @@ import java.util.concurrent.TimeUnit
 import akka.actor.ActorSystem
 import akka.testkit.{EventFilter, ImplicitSender, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
-import example.org.nirmalya.experiments.GameSessionCustodianActor
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.DBHatch.DBActionGameSessionRecord
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.ExternalAPIParams.{ExpandedMessage, RESPGameSessionBodyWhenSuccessful}
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.{ComputedGameSession, EmittedWhenGameSessionIsFinished, GameSession, GameSessionEndedByPlayer, GameSessionEndedByTimeOut, HuddleGame, LeaderboardConsumableData, QuestionAnswerTuple}
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.HuddleGame.EvInitiated
-import example.org.nirmalya.experiments.MariaDBAware.{GameSessionDBButlerActor, NonExistentComputedGameSession, NonExistentGameSessionRecord}
-import generated.Tables._
+import com.OneHuddle.GamePlaySessionService.GameSessionCustodianActor
+
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.ExternalAPIParams.{ExpandedMessage, RESPGameSessionBodyWhenSuccessful}
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{ComputedGameSession, EmittedWhenGameSessionIsFinished, GameSession, GameSessionEndedByPlayer, GameSessionEndedByTimeOut, HuddleGame, LeaderboardConsumableData, QuestionAnswerTuple}
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.HuddleGame.EvInitiated
+import com.OneHuddle.GamePlaySessionService.MariaDBAware.{GameSessionDBButlerActor, NonExistentComputedGameSession, NonExistentGameSessionRecord}
+
+
+
 import org.jooq.SQLDialect
 import org.jooq.impl.DSL
 import org.nirmalya.experiment.test.common._

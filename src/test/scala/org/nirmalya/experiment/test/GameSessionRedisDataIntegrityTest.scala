@@ -8,9 +8,9 @@ import org.scalatest._
 import Matchers._
 import com.redis.RedisClient
 import org.json4s.native.Serialization.{read, write}
-import example.org.nirmalya.experiments.GameSessionStateHolderActor
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.HuddleGame.{GameSessionHasStartedState, GameSessionIsContinuingState, GameSessionIsPausedState, GameSessionYetToStartState}
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol._
+import com.OneHuddle.GamePlaySessionService.GameSessionStateHolderActor
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.HuddleGame.{GameSessionHasStartedState, GameSessionIsContinuingState, GameSessionIsPausedState, GameSessionYetToStartState}
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol._
 
 import org.scalatest.{BeforeAndAfterAll, MustMatchers, WordSpecLike}
 

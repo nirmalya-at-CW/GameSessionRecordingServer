@@ -1,16 +1,15 @@
-package example.org.nirmalya.experiments
+package com.OneHuddle.GamePlaySessionService
 
 import java.time.{LocalDateTime, ZoneId}
-import java.time.format.DateTimeFormatter
 
-import akka.actor.{Actor, ActorContext, ActorLogging, ActorRef, PoisonPill, Props, Terminated}
+import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
 import akka.event.LoggingReceive
 import akka.pattern._
 import akka.util.Timeout
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.DBHatch.{DBActionGameSessionRecord, DBActionInsert, DBActionInsertSuccess, DBActionOutcome}
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.ExternalAPIParams._
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.{DBHatch, DespatchedToLeaderboardAcknowledgement, GameSession, GameSessionEndedByManager, GameSessionEndedByPlayer, GameSessionEndedByTimeOut, HuddleGame, LeaderboardConsumableData}
-import example.org.nirmalya.experiments.MariaDBAware.GameSessionDBButlerActor
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.ExternalAPIParams.{ExpandedMessage, RESPGameSessionBodyWhenFailed, RESPGameSessionBodyWhenSuccessful}
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.DBHatch.{DBActionGameSessionRecord, DBActionInsert, DBActionInsertSuccess, DBActionOutcome}
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{DBHatch, DespatchedToLeaderboardAcknowledgement, GameSession, GameSessionEndedByPlayer, HuddleGame, LeaderboardConsumableData}
+import com.OneHuddle.GamePlaySessionService.MariaDBAware.GameSessionDBButlerActor
 
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.util.{Failure, Success}

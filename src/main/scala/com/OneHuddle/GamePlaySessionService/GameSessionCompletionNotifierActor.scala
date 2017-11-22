@@ -1,7 +1,7 @@
-package example.org.nirmalya.experiments
+package com.OneHuddle.GamePlaySessionService
 
 import akka.actor.{Actor, ActorLogging, Props}
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.LeaderboardConsumableData
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.LeaderboardConsumableData
 
 /**
   * Created by nirmalya on 12/10/17.

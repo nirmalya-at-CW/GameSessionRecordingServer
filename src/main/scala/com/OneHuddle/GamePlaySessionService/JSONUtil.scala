@@ -1,4 +1,4 @@
-package example.org.nirmalya.experiments
+package com.OneHuddle.GamePlaySessionService
 
 import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
 import com.fasterxml.jackson.module.scala.DefaultScalaModule

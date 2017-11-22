@@ -1,19 +1,19 @@
-package example.org.nirmalya.experiments.MariaDBAware
+package com.OneHuddle.GamePlaySessionService.MariaDBAware
 
 import java.sql.{Connection, DriverManager}
 
 import akka.actor.{Actor, ActorLogging, Props}
 
 
+import com.OneHuddle.GamePlaySessionService.jOOQ.generated.Tables._
 import collection.JavaConverters._
-import org.jooq.scalaextensions.Conversions._
+
 
 import org.jooq.SQLDialect
 import org.jooq.impl.DSL
 
 import scala.concurrent.ExecutionContextExecutor
 
-import generated.Tables._
 
 case class PlayerDetails(companyID: String, belongsToDepartment: String, playerID: String,
                                   companyName: String, playerName: String, playerEMailID: String,

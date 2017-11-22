@@ -1,11 +1,11 @@
-package example.org.nirmalya.experiments
+package com.OneHuddle.GamePlaySessionService
 
 import java.time.{Instant, ZoneId, ZoneOffset}
 
 import akka.actor.{ActorLogging, FSM, LoggingFSM, Props}
 import GameSessionHandlingServiceProtocol.{HuddleGame, NonExistingCompleteGamePlaySessionHistory, RedisRecordingStatus, _}
 import GameSessionHandlingServiceProtocol.HuddleGame.{EvGamePlayRecordSoFarRequired, _}
-import example.org.nirmalya.experiments.RedisAware.RedisButlerGameSessionRecording
+import com.OneHuddle.GamePlaySessionService.RedisAware.RedisButlerGameSessionRecording
 
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -103,7 +103,6 @@ class GameSessionStateHolderActor(val cleanDataOnExit: Boolean,
 
      case Event(questionAnswered: HuddleGame.EvQuestionAnswered, _) =>
 
-       printf(s" ***Sender ${sender}")
        sender ! redisButler.recordThatAQuestionIsAnswered(
          questionAnswered.receivedAt,
          questionAnswered.questionAndAnswer,
@@ -192,7 +191,6 @@ class GameSessionStateHolderActor(val cleanDataOnExit: Boolean,
         val sessionEndedAtTimezoneApplied =
           Instant.ofEpochMilli(cleanUpRequired.endedAt).atZone(ZoneId.of(seededWithSession.playedInTimezone))
 
-        printf(s" *** Parent ${context.parent}")
         // parent == custodian of this state-holder
         context.parent ! EvGameFinishedAndScored(
                             ComputedGameSession(

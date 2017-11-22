@@ -1,32 +1,28 @@
-package example.org.nirmalya.experiments
+package com.OneHuddle.GamePlaySessionService
 
 import akka.actor.ActorSystem
 import akka.event.Logging.LogLevel
 import akka.event.{Logging, LoggingAdapter}
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.Http.ServerBinding
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
 import akka.http.scaladsl.model.{HttpEntity, HttpRequest}
-import akka.http.scaladsl.server.{Route, RouteResult}
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.RouteResult.{Complete, Rejected}
-import akka.http.scaladsl.server.directives.{DebuggingDirectives, LogEntry, LoggingMagnet}
-import akka.stream.{ActorMaterializer, Materializer}
-import org.json4s.{DefaultFormats, Formats, ShortTypeHints, native}
-
-import scala.concurrent.{ExecutionContext, Future}
+import akka.http.scaladsl.server.directives.{DebuggingDirectives, LoggingMagnet}
 import akka.pattern._
 import akka.stream.scaladsl.Sink
+import akka.stream.{ActorMaterializer, Materializer}
 import akka.util.Timeout
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.ExternalAPIParams._
 import com.redis.RedisClient
 import com.typesafe.config.ConfigFactory
-
-import scala.concurrent.duration.Duration
-import collection.JavaConversions._
-import scala.util.{Failure, Success, Try}
 import de.heikoseeberger.akkahttpjson4s.Json4sSupport
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.ExternalAPIParams._
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.RedisRecordingStatus
+import org.json4s.{DefaultFormats, native}
+
+import scala.collection.JavaConversions._
+import scala.concurrent.duration.Duration
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success, Try}
 
 
 
@@ -147,8 +143,8 @@ object GameSessionRecordingServer {
   }
 
   def startRoute(implicit mat: Materializer) = {
-    import akka.http.scaladsl.server.Directives._
     import Json4sSupport._
+    import akka.http.scaladsl.server.Directives._
 
     implicit val serialization = native.Serialization
     implicit val formats       = DefaultFormats
@@ -169,8 +165,8 @@ object GameSessionRecordingServer {
   }
 
   def prepareRoute(implicit mat: Materializer) = {
-    import akka.http.scaladsl.server.Directives._
     import Json4sSupport._
+    import akka.http.scaladsl.server.Directives._
 
     implicit val serialization = native.Serialization
     implicit val formats       = DefaultFormats
@@ -190,8 +186,8 @@ object GameSessionRecordingServer {
   }
 
   def playRoute(implicit mat: Materializer) = {
-    import akka.http.scaladsl.server.Directives._
     import Json4sSupport._
+    import akka.http.scaladsl.server.Directives._
 
     implicit val serialization = native.Serialization
     implicit val formats       = DefaultFormats
@@ -210,8 +206,8 @@ object GameSessionRecordingServer {
   }
 
   def playClipRoute(implicit mat: Materializer) = {
-    import akka.http.scaladsl.server.Directives._
     import Json4sSupport._
+    import akka.http.scaladsl.server.Directives._
 
     implicit val serialization = native.Serialization
     implicit val formats       = DefaultFormats
@@ -230,8 +226,8 @@ object GameSessionRecordingServer {
   }
 
   def pauseRoute(implicit mat: Materializer) = {
-    import akka.http.scaladsl.server.Directives._
     import Json4sSupport._
+    import akka.http.scaladsl.server.Directives._
 
     implicit val serialization = native.Serialization
     implicit val formats       = DefaultFormats
@@ -249,8 +245,8 @@ object GameSessionRecordingServer {
   }
 
   def endByManagerRoute(implicit mat: Materializer) = {
-    import akka.http.scaladsl.server.Directives._
     import Json4sSupport._
+    import akka.http.scaladsl.server.Directives._
 
     implicit val serialization = native.Serialization
     implicit val formats       = DefaultFormats
@@ -268,8 +264,8 @@ object GameSessionRecordingServer {
   }
 
   def endRoute(implicit mat: Materializer) = {
-    import akka.http.scaladsl.server.Directives._
     import Json4sSupport._
+    import akka.http.scaladsl.server.Directives._
 
     implicit val serialization = native.Serialization
     implicit val formats       = DefaultFormats

@@ -1,4 +1,4 @@
-package example.org.nirmalya.experiments
+package com.OneHuddle.GamePlaySessionService
 
 import java.util.concurrent.TimeUnit
 
@@ -6,9 +6,9 @@ import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
 import akka.event.LoggingReceive
 import akka.pattern._
 import akka.util.Timeout
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.ExternalAPIParams._
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.{ExternalAPIParams, GameSession, GameSessionEndedByManager, GameSessionEndedByPlayer, HuddleGame, QuestionAnswerTuple, RedisRecordingStatus}
-import example.org.nirmalya.experiments.MariaDBAware.GameSessionDBButlerActor
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.ExternalAPIParams._
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{ExternalAPIParams, GameSession, GameSessionEndedByManager, GameSessionEndedByPlayer, HuddleGame, QuestionAnswerTuple, RedisRecordingStatus}
+import com.OneHuddle.GamePlaySessionService.MariaDBAware.GameSessionDBButlerActor
 
 import scala.concurrent.Future
 import scala.concurrent.duration.{Duration, FiniteDuration}

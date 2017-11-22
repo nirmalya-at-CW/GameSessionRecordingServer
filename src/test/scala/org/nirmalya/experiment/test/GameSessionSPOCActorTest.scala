@@ -5,9 +5,9 @@ import java.util.concurrent.TimeUnit
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.ExternalAPIParams._
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.{GameSession, QuestionAnswerTuple}
-import example.org.nirmalya.experiments.{GameSessionCompletionEmitterActor, GameSessionSPOCActor}
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.ExternalAPIParams._
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{GameSession, QuestionAnswerTuple}
+import com.OneHuddle.GamePlaySessionService.{GameSessionSPOCActor}
 import org.nirmalya.experiment.test.common.{DummyLeaderBoardServiceGatewayActor, StopSystemAfterAll}
 import org.scalatest.{BeforeAndAfterAll, MustMatchers, WordSpecLike}
 

@@ -1,8 +1,8 @@
-package example.org.nirmalya.experiments
+package com.OneHuddle.GamePlaySessionService
 
 import akka.actor.{Actor, ActorLogging, Props}
 import com.mashape.unirest.http.Unirest
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.EmittedWhenGameSessionIsFinished
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.EmittedWhenGameSessionIsFinished
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}

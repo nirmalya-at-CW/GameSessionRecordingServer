@@ -1,9 +1,9 @@
-package example.org.nirmalya.experiments
+package com.OneHuddle.GamePlaySessionService
 
 import java.time.{LocalDateTime, ZonedDateTime}
-import java.util.UUID
 
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.ExternalAPIParams.{REQStartAGameWith, RESPGameSessionBody}
+
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.ExternalAPIParams.{REQStartAGameWith, RESPGameSessionBody}
 import org.json4s.{DefaultFormats, Formats, ShortTypeHints}
 import org.json4s.native.Serialization
 import de.heikoseeberger.akkahttpjson4s.Json4sSupport

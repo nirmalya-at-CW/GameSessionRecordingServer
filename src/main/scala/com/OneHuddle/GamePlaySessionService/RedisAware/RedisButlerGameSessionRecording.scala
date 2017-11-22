@@ -1,10 +1,10 @@
-package example.org.nirmalya.experiments.RedisAware
+package com.OneHuddle.GamePlaySessionService.RedisAware
 
 import akka.actor.{Actor, ActorLogging, Props}
-import com.mashape.unirest.http.Unirest
+
 import com.redis.RedisClient
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.{CompleteGamePlaySessionHistory, FailedRedisSessionStatus, GameClipRunInREDIS, GameCreatedTupleInREDIS, GameEndedTupleInREDIS, GameInfoTupleInREDIS, GameInitiatedTupleInREDIS, GamePausedTupleInREDIS, GamePlayedTupleInREDIS, GamePreparedTupleInREDIS, GameSession, GameSessionEndingReason, HuddleGame, NonExistingCompleteGamePlaySessionHistory, OKRedisSessionStatus, QuestionAnswerTuple, RedisRecordingStatus, RedisSessionStatus, formats_2}
-import example.org.nirmalya.experiments.GameSessionHandlingServiceProtocol.HuddleGame.EvGamePlayRecordSoFarRequired
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{CompleteGamePlaySessionHistory, FailedRedisSessionStatus, GameClipRunInREDIS, GameCreatedTupleInREDIS, GameEndedTupleInREDIS, GameInfoTupleInREDIS, GameInitiatedTupleInREDIS, GamePausedTupleInREDIS, GamePlayedTupleInREDIS, GamePreparedTupleInREDIS, GameSession, GameSessionEndingReason, HuddleGame, NonExistingCompleteGamePlaySessionHistory, OKRedisSessionStatus, QuestionAnswerTuple, RedisRecordingStatus, RedisSessionStatus, formats_2}
+
 import org.json4s._
 import org.json4s.native.JsonMethods._
 import org.json4s.native.Serialization._
