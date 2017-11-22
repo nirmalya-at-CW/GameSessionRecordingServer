@@ -80,17 +80,18 @@ session-related transient data.
 * At this point, timeout for a game session occurs after 20 seconds. This is hardcoded.
 
 ##   Major TODOs
-*   One connection per _GamePlayRecorderActor_ may soon hit a wall, 
+*   One REDIS connection per _GameSessionStateHolderActor_ may soon hit a wall, 
 because each such Actor may remain alive for a long duration. We have
-to look for an alternative of 'pooled connections'.
-*   We have to implement a mirror actor for every _GamePlayRecorderActor_
-to provide availability. How will these two communicate?
+to look for an alternative of 'pooled connections'. The 3rd party REDIS library we are using,
+allows for connection pooling. We have to explore it.
+*   The _GameSessionStateHolderActor_ should be restartable. Hence, it has save its state. This feature doesn't
+exist.
 *   _GameSessionSPOCActor_ should periodically check if REDIS is accessible.
 If it is not, then a warning message must be logged and a message must
 be sent to the Admin Actor (TBD).
 *   _GameSessionCompletionEmitterActor_ must call the HTTP Endpoints using
 JSON. At the moment, it is passing Text.
-*   Error codes emitted by GameSessionRecorderActor should be properly folded inside
+*   Error codes emitted by _GameSessionStateHolderActor_ should be properly folded inside
 responses that callers of the Service expects (refer to [confluence page](https://codewalla.atlassian.net/wiki/spaces/1NFL/pages/17727490/GameSessionRecordingService+Requests+and+Responses) ).
 
 ##   Example JSON messages for posting to GameSessionHandlingService
