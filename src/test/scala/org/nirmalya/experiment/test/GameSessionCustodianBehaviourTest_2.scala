@@ -88,23 +88,23 @@ class GameSessionCustodianBehaviourTest_2  extends TestKit(ActorSystem(
   with ImplicitSender
   with StopSystemAfterAll {
 
-  val config = ConfigFactory.load()
+  val testSpecificConfig = system.settings.config
 
-  val dbAccessURL = config.getConfig("GameSession.externalServices").getString("dbAccessURL")
+  val dbAccessURL = testSpecificConfig.getConfig("GameSession.externalServices").getString("dbAccessURL")
 
   val (redisHost, redisPort) = (
 
-    config.getConfig("GameSession.redisEndPoint").getString("host"),
-    config.getConfig("GameSession.redisEndPoint").getInt("port")
+    testSpecificConfig.getConfig("GameSession.redisEndPoint").getString("host"),
+    testSpecificConfig.getConfig("GameSession.redisEndPoint").getInt("port")
     )
 
   val maxGameSessionLifetime = Duration(
-    config.getConfig("GameSession.maxGameSessionLifetime").getInt("duration"),
+    testSpecificConfig.getConfig("GameSession.maxGameSessionLifetime").getInt("duration"),
     TimeUnit.SECONDS
   )
 
   val dummyLeaderboardServiceEndpoint =
-    config.getConfig("GameSession.externalServices").getStringList("completionSubscribers").get(0)
+    testSpecificConfig.getConfig("GameSession.externalServices").getStringList("completionSubscribers").get(0)
 
   val questionaAndAnswers = IndexedSeq(
     QuestionAnswerTuple(1,1,true,10,5),
@@ -138,7 +138,7 @@ class GameSessionCustodianBehaviourTest_2  extends TestKit(ActorSystem(
           redisPort,
           maxGameSessionLifetime,
           leaderboardInfomer,
-          ""
+          dbAccessURL
         ),custodianActorName)
 
       custodian ! evInitiated
@@ -165,6 +165,9 @@ class GameSessionCustodianBehaviourTest_2  extends TestKit(ActorSystem(
 
       val k = fetchGameSessionFromDB(gameSessionInfo) // 'k' is a list
 
+      println(s"k.head.score [${k.head.score}]")
+      println(s"total correct answers [${evQuestionAnswered_1.questionAndAnswer.points + evQuestionAnswered_2.questionAndAnswer.points}]")
+
       assert(
         k != NonExistentGameSessionRecord &&
           k.tail.isEmpty                    &&  // Because we expect only one record with corresponding keyfields to exist
@@ -184,7 +187,8 @@ class GameSessionCustodianBehaviourTest_2  extends TestKit(ActorSystem(
   private def
   fetchGameSessionFromDB(gameSessionInfo: GameSession) = {
 
-    val e = DSL.using(DriverManager.getConnection(dbAccessURL), SQLDialect.MARIADB)
+    val c = DriverManager.getConnection(dbAccessURL)
+    val e = DSL.using(c, SQLDialect.MARIADB)
     val x = GAMESESSIONRECORDS as "x"
 
     val k = e.selectFrom(GAMESESSIONRECORDS)
@@ -197,6 +201,7 @@ class GameSessionCustodianBehaviourTest_2  extends TestKit(ActorSystem(
           .asScala
           .toList
 
+    c.close
     if (k.isEmpty) List(NonExistentGameSessionRecord) else k
   }
 

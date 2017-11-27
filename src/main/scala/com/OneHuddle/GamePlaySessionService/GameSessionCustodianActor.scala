@@ -51,7 +51,7 @@ class GameSessionCustodianActor (
 
   //TODO: instead of making this a direct child, we should create a router and encapsulate that with HTTP apis.
   //TODO: we should pass a different dispatcher (properly configured) to the actor below; currently it is the same dispatcher
-  val gameSessionRecordDBButler = context.system.actorOf(GameSessionDBButlerActor(context.dispatcher))
+  val gameSessionRecordDBButler = context.system.actorOf(GameSessionDBButlerActor(dbAccessURL, context.dispatcher))
   context.watch(gameSessionStateHolderActor)
 
   def gamePlayIsOnState: Receive = LoggingReceive.withLabel("gamePlayIsOnState") {

@@ -60,9 +60,9 @@ class PlayerPerformanceDBButlerActor(
 
 object PlayerPerformanceDBButlerActor {
 
-  def apply(connectionString: String, dbAccessDispatcher: ExecutionContextExecutor): Props =
+  def apply(dbAccessURL: String, dbAccessDispatcher: ExecutionContextExecutor): Props =
 
-             Props(new GameSessionDBButlerActor(dbAccessDispatcher))
+             Props(new GameSessionDBButlerActor(dbAccessURL, dbAccessDispatcher))
 
   def retrieve(
         c: Connection, companyID: String, department: String, gameID: String, playerID: String)

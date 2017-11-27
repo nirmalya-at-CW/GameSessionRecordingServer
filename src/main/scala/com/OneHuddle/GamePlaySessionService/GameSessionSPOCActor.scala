@@ -42,7 +42,7 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
   val dbAccessURL = context.system.settings.config.getConfig("GameSession.externalServices").getString("dbAccessURL")
 
   // TODO: arrange for a specific dispatcher for the actors, accessing databases.
-  val gameSessionRecordDBButler = context.actorOf(GameSessionDBButlerActor(context.system.dispatcher))
+  val gameSessionRecordDBButler = context.actorOf(GameSessionDBButlerActor(dbAccessURL, context.system.dispatcher))
 
   var activeGameSessionCustodians: Map[String, ActorRef] = Map.empty
 
@@ -217,7 +217,7 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
 
        activeGameSessionCustodians = activeGameSessionCustodians - custodianKey
       log.info(s"Custodian Actor ($custodianActor) terminated." )
-      context stop(self)
+      // context stop(self)
 
     case (m: Any) =>
 

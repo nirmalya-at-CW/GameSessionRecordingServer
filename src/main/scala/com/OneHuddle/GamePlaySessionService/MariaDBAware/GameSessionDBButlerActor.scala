@@ -24,12 +24,10 @@ import scala.concurrent.ExecutionContextExecutor
 
 
 
-class GameSessionDBButlerActor(val dbAccessDispatcher: ExecutionContextExecutor) extends Actor with ActorLogging {
+class GameSessionDBButlerActor(dbAccessURL: String, val dbAccessDispatcher: ExecutionContextExecutor) extends Actor with ActorLogging {
 
 
-  val dbAccessURL = context.system.settings.config.getConfig("GameSession.externalServices").getString("dbAccessURL")
-
-  printf(s" **** dbAcccessURL = $dbAccessURL")
+  log.info(s"DBButler for GameSession, initialized with driverURL:($dbAccessURL)")
 
   override def receive: Receive =  {
 
@@ -54,6 +52,7 @@ class GameSessionDBButlerActor(val dbAccessDispatcher: ExecutionContextExecutor)
         finishedAndComputedGameSession.totalPointsObtained,
         finishedAndComputedGameSession.timeTakenToFinish
       )
+
       val rows = GameSessionDBButlerActor
                  .upsert(
                    DriverManager.getConnection(dbAccessURL),
@@ -71,16 +70,15 @@ class GameSessionDBButlerActor(val dbAccessDispatcher: ExecutionContextExecutor)
 
 object GameSessionDBButlerActor {
 
-  def apply(dbAccessDispatcher: ExecutionContextExecutor): Props =
+  def apply(dbAccessURL: String, dbAccessDispatcher: ExecutionContextExecutor): Props =
 
-             Props(new GameSessionDBButlerActor(dbAccessDispatcher))
+    Props(new GameSessionDBButlerActor(dbAccessURL, dbAccessDispatcher))
 
   def retrieve(
         c: Connection, companyID: String, department: String, gameID: String, playerID: String, gameSessionUUID: String)
       : List[ComputedGameSession] = {
 
     val e = DSL.using(c, SQLDialect.MARIADB)
-    val x = GAMESESSIONRECORDS as "x"
 
     val k = e.selectFrom(GAMESESSIONRECORDS)
       .where(GAMESESSIONRECORDS.COMPANYID.eq(companyID))
@@ -92,10 +90,11 @@ object GameSessionDBButlerActor {
       .asScala
       .toList
 
-    // TODO:
-    // Consider retrieving a record of PlayerPerformance and treat that as a Record type.
-    // What if we return a list of Records from this method, keeping the equivalence between
-    // Select and Upsert (below)? Does that bring any extra cleaner interface?
+    // TODO: We are taking particular care to explicitly closing a connection below.
+    // TODO: However, we have to find out a good functional approach to emulate Java's
+    // TODO: Try-with-resources here (in Scala World, it is called ARM: Automatic
+    // TODO: Resource Management
+    c.close()
 
     transformDBRecordToComputedGameSession(
       if (k.isEmpty)
@@ -123,9 +122,17 @@ object GameSessionDBButlerActor {
     gameSessionRecord.setEndreason               (gameSessionRecordableData.endReason)
     gameSessionRecord.setScore                   (gameSessionRecordableData.score)
 
-    e.insertInto(GAMESESSIONRECORDS)
+    val result = e.insertInto(GAMESESSIONRECORDS)
        .set(gameSessionRecord)
        .execute()
+
+    // TODO: We are taking particular care to explicitly closing a connection below.
+    // TODO: However, we have to find out a good functional approach to emulate Java's
+    // TODO: Try-with-resources here (in Scala World, it is called ARM: Automatic
+    // TODO: Resource Management
+    c.close()
+
+    result
 
   }
 

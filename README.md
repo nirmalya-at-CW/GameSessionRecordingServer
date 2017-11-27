@@ -99,15 +99,19 @@ responses that callers of the Service expects (refer to [confluence page](https:
 Keys are important, values are just examples.
 
 ##  Request to start a game (endpoint:  /start)
-    {
-        "companyID":"1"
-        "company":"ABC",
-        "manager":"Vikas",
-        "playerID":"Nirmalya",
-        "gameID":"2",
-        "gameName":"1Hudd",
-        "gameUUID":"A123"
-    }
+{
+   "companyID":"ABC",
+   "departmentID":"QA",
+   "manager":"Vikas",
+   "playerID":"Nirmalya",
+   "gameID":"G01",
+   "gameName":"Tic-Tac-Toe",
+   "gameType":"SP",
+   "gameSessionUUID":"A234",
+   "playedInTimezone":"Asia/Calcutta"
+}
+
+Key 'groupID' is _optional_.
     
 ##  Response to start a game
     
@@ -119,20 +123,18 @@ Keys are important, values are just examples.
        },
        "contents":{
           "dataCarried":{
-             "gameSessionID":"1.ABC.Vikas.Nirmalya.1.1Hudd.A123"
+             "gameSessionID":"A234"
           }
        }
     }
     
-    It is perhaps obvious how the **SessionID** is formed. We are simply 'dot-separating' the fields that are supplied with
-    '/start' request. Ensuring uniqueness is the **responsibility of the caller**. Even if all the other fields are the same,
-    'gameUUID' is guaranteed to be unique. 
+    It is obvious that the caller has the responsibility of maintaining **uniqueness** of the field 'gameSessionUUID'. 
 ##  Request to prepare a game (endpoint:  /prepare)
     {
-       "sessionID":"ABC.Vikas.playerID.1Hudd.A123",
+       "sessionID":"A234",
        "questionMetadata":"some metadata, to be used by downstream processors"
     }
-
+    
 ##  Response to play a game
 
    {
@@ -142,13 +144,23 @@ Keys are important, values are just examples.
          "description":"Prepared"
       }
    }
+   
+   or
+       
+   {
+      "message":{
+         "successId":1300,
+         "description":"No gameSession (A234) exists"
+      },
+      "opSuccess":false
+   }
     
     
 Note: At this point, the GameSession has started, so that can one can play (below).
 
 ##  Request to play a game (endpoint:  /play)
     {
-       "sessionID":"ABC.Vikas.playerID.1Hudd.A123",
+       "sessionID":"A234",
        "questionID":"1",
        "answerID":"2",
        "isCorrect":true,
@@ -168,7 +180,7 @@ Note: At this point, the GameSession has started, so that can one can play (belo
     
 ##  Request to play an audio/video clip during a game (endpoint:  /playClip)
     {
-       "sessionID":"ABC.Vikas.playerID.1Hudd.A123",
+       "sessionID":"A234",
        "clipName":"kishorekumar.mp3"
     }
 
@@ -185,7 +197,7 @@ Note: At this point, the GameSession has started, so that can one can play (belo
 ##  Request to pause a game (endpoint: /pause)
     
     {
-           "sessionID":"ABC.Vikas.playerID.1Hudd.A123"
+           "sessionID":"A234"
     }
     
 ##  Response to pause a game
@@ -201,7 +213,7 @@ Note: At this point, the GameSession has started, so that can one can play (belo
 ##  Request to end a game (endpoint: /end)
      
     {
-        "sessionID":"ABC.Vikas.playerID.1Hudd.A123",
+        "sessionID":"A234",
         "totalTimeTakenByPlayerAtFE":23
     }
     
@@ -218,7 +230,7 @@ Note: At this point, the GameSession has started, so that can one can play (belo
 ##  Request to end a game by the Manager (endpoint: /endByManager)
      
     {
-        "sessionID":"ABC.Vikas.playerID.1Hudd.A123",
+        "sessionID":"A234",
         "managerName":"Vikas"
     }
         
@@ -237,22 +249,22 @@ Note: At this point, the GameSession has started, so that can one can play (belo
 # _curl_ command examples
 
 ### start
-curl -v -H "Content-Type: application/json" -X POST -d '{"companyName":"ABC","companyID":1,"manager":"Vikas","playerID":"Nirmalya","gameName":"1Hudd","gameID":1,"gameSessionUUID":"A123"}' http://localhost:9090/start
+curl -v -m 1 -H "Content-Type: application/json" -X POST -d '{"companyID":"ABC","departmentID":"QA","manager":"Vikas","playerID":"Nirmalya","gameID":"G01","gameName":"Tic-Tac-Toe","gameType":"SP","gameSessionUUID":"A456","playedInTimezone":"Asia/Calcutta"}' http://localhost:9090/start
 
 ### prepare
-curl -v -H "Content-Type: application/json" -X POST -d '{"sessionID":"1.ABC.Vikas.Nirmalya.1.1Hudd.A123","questionMetadata":"some metadata"}' http://localhost:9090/prepare
+curl -v -H "Content-Type: application/json" -X POST -d '{"sessionID":"A234","questionMetadata":"some metadata"}' http://localhost:9090/prepare
 
 ### play
-curl -v -H "Content-Type: application/json" -X POST -d '{"sessionID":"1.ABC.Vikas.Nirmalya.1.1Hudd.A123","questionID":"1", "answerID":"2","isCorrect":true,"points":200,"timeSpentToAnswerAtFE": 2}' http://localhost:9090/play
+curl -v -H "Content-Type: application/json" -X POST -d '{"sessionID":"A234","questionID":"1", "answerID":"2","isCorrect":true,"points":200,"timeSpentToAnswerAtFE": 2}' http://localhost:9090/play
 
 ### pause
-curl -v -H "Content-Type: application/json" -X POST -d '{"sessionID":"1.ABC.Vikas.Nirmalya.1.1Hudd.A123","questionID":"1"}' http://localhost:9090/pause
+curl -v -H "Content-Type: application/json" -X POST -d '{"sessionID":"A234","questionID":"1"}' http://localhost:9090/pause
 
 ### playClip
-curl -v -H "Content-Type: application/json" -X POST -d '{"sessionID":"1.ABC.Vikas.Nirmalya.1.1Hudd.A123","clipName":"KishoreKumar.mp3"}' http://localhost:9090/playClip 
+curl -v -H "Content-Type: application/json" -X POST -d '{"sessionID":"A234","clipName":"KishoreKumar.mp3"}' http://localhost:9090/playClip 
 
 ### end
-curl -v -H "Content-Type: application/json" -X POST -d '{"sessionID":"ABC.Vikas.playerID.1Hudd.A123","totalTimeTakenByPlayerAtFE":23}' http://localhost:9090/end
+curl -v -H "Content-Type: application/json" -X POST -d '{"sessionID":"A234","totalTimeTakenByPlayerAtFE":23}' http://localhost:9090/end
 
 ### endByManager
-curl -v -H "Content-Type: application/json" -X POST -d '{"sessionID":"ABC.Vikas.playerID.1Hudd.A123","managerName":"Vikas"}' http://localhost:9090/endByManager
+curl -v -H "Content-Type: application/json" -X POST -d '{"sessionID":"A234","managerName":"Vikas"}' http://localhost:9090/endByManager

@@ -5,8 +5,9 @@ import kamon.Kamon
 /**
   * Created by nirmalya on 26/8/17.
   */
-object MonitoredGamePlayRecorder extends App {
+object GamePlayRecorder extends App {
 
+  Kamon.start
 
   GameSessionRecordingServer.start(Array.empty[String])
 

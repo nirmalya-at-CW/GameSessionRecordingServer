@@ -31,7 +31,7 @@ case class DBActionPlayerToInsert(companyID: String, belongsToDepartment: String
   * Created by nirmalya on 4/10/17.
   */
 class PlayerDetailsButlerActor(
-            val connectionString:   String,
+            val dbAccessURL:   String,
             val dbAccessDispatcher: ExecutionContextExecutor
       ) extends Actor with ActorLogging {
 
@@ -47,9 +47,9 @@ class PlayerDetailsButlerActor(
 
 object PlayerDetailsButlerActor {
 
-  def apply(dbAccessDispatcher: ExecutionContextExecutor): Props =
+  def apply(dbAccessURL: String, dbAccessDispatcher: ExecutionContextExecutor): Props =
 
-             Props(new GameSessionDBButlerActor(dbAccessDispatcher))
+             Props(new GameSessionDBButlerActor(dbAccessURL,dbAccessDispatcher))
 
   def retrieve(c: Connection, companyName: String, department: String, playerID: String): List[PlayerDetails] = {
 

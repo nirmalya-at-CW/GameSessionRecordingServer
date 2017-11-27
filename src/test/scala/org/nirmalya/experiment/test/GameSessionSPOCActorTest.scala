@@ -198,21 +198,17 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
       spocActor ! reqPlayAgain
 
 
-      // We expect that SPOCActor will not acknowledge this message because it should be folding up
-      // by now. Then, after a finite duration - 10 seconds, hardcoded below - the SPOCActor should
-      // stop itself.
+      // We expect that because the session must have timed-out and hence, terminated, the SPOC Actor will not find the
+      // session alive. Therefore, it should immediately respond to indicate, the session's absence
 
-      expectNoMsg(Duration(10, "seconds"))
+      expectMsgPF(Duration(1, "second")) {
 
-      testProbe.expectTerminated(spocActor)
-
-     /* expectMsgPF (Duration(3, "second")) {
-        case m:RESPGameSessionBodyWhenFailed =>
-          m.opSuccess == false &&
-            m.message.successId == 1300 &&
-            m.message.description ==  (s"No gameSession (${reqStart.gameSessionUUID}) exists")
-      }*/
-
+        case m: RESPGameSessionBodyWhenFailed =>
+          m.opSuccess == true               &&
+          m.message.successId     == 1300   &&
+          m.message.description   == s"No gameSession (${reqStart.gameSessionUUID}) exists" &&
+          m.contents              == None
+      }
     }
   }
 }
