@@ -18,14 +18,12 @@ import scala.util.{Failure, Success}
 /**
   * Created by nirmalya on 20/6/17.
   */
-class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor with ActorLogging {
+class GameSessionSPOCActor(gameSessionFinishedEventEmitter: ActorRef) extends Actor with ActorLogging {
 
   case object ShutYourself
 
 
   implicit val executionContext = context.dispatcher
-
-
 
 
   val (redisHost,redisPort) = (
@@ -69,7 +67,7 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
       )
 
       if (activeGameSessionCustodians.isDefinedAt(r.gameSessionUUID))
-        sender ! RESPGameSessionBodyWhenFailed(ExpandedMessage(1200, s"GameSession with $r is already active."))
+        sender ! HuddleRESPGameSessionBodyWhenFailed(ExpandedMessage(1200, s"GameSession with $r is already active."))
       else {
         val originalSender = sender()
         val child = context.actorOf(
@@ -78,7 +76,7 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
                   redisHost,
                   redisPort,
                   maxGameSessionLifetime,
-                  gameSessionFinishEmitter,
+                  gameSessionFinishedEventEmitter,
                   dbAccessURL
               ),
               gameSessionInfo.toString
@@ -102,7 +100,7 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
          case Some (sessionActor) =>
            (sessionActor ? HuddleGame.EvQuizIsFinalized(System.currentTimeMillis(),r.questionMetadata)).pipeTo(originalSender)
          case None  =>
-           originalSender ! RESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists"))
+           originalSender ! HuddleRESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists"))
       }
 
 
@@ -126,12 +124,12 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
                                                   )
               )
               .recoverWith{
-                case e: AskTimeoutException => Future(RESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"Request TimedOut")))
+                case e: AskTimeoutException => Future(HuddleRESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"Request TimedOut")))
               }
               .pipeTo(originalSender)
 
           case None  =>
-            originalSender ! RESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists"))
+            originalSender ! HuddleRESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists"))
       }
 
 
@@ -144,11 +142,11 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
       case Some (sessionActor) =>
         (sessionActor ? HuddleGame.EvPlayingClip(System.currentTimeMillis(),r.clipName))
         .recoverWith{
-            case e: AskTimeoutException => Future(RESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"Request TimedOut")))
+            case e: AskTimeoutException => Future(HuddleRESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"Request TimedOut")))
         }
         .pipeTo(originalSender)
       case None =>
-        originalSender ! RESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists"))
+        originalSender ! HuddleRESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists"))
       }
 
     case r: ExternalAPIParams.REQPauseAGameWith =>
@@ -160,11 +158,11 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
         case Some (sessionActor) =>
           (sessionActor ? HuddleGame.EvPaused(System.currentTimeMillis()))
           .recoverWith{
-            case e: AskTimeoutException => Future(RESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"Request TimedOut")))
+            case e: AskTimeoutException => Future(HuddleRESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"Request TimedOut")))
           }
           .pipeTo(originalSender)
         case None =>
-          originalSender ! RESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists"))
+          originalSender ! HuddleRESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists"))
       }
 
     case r: ExternalAPIParams.REQEndAGameWith =>
@@ -179,12 +177,12 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
                                       r.totalTimeTakenByPlayerAtFE
                           ))
           .recoverWith{
-            case e: AskTimeoutException => Future(RESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"Request TimedOut")))
+            case e: AskTimeoutException => Future(HuddleRESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"Request TimedOut")))
           }
           .pipeTo(originalSender)
 
         case None =>
-          originalSender ! RESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists"))
+          originalSender ! HuddleRESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists"))
       }
 
     case r: ExternalAPIParams.REQEndAGameByManagerWith =>
@@ -199,12 +197,12 @@ class GameSessionSPOCActor(gameSessionFinishEmitter: ActorRef) extends Actor wit
                                       r.managerName)
           )
           .recoverWith{
-            case e: AskTimeoutException => Future(RESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"Request TimedOut")))
+            case e: AskTimeoutException => Future(HuddleRESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"Request TimedOut")))
           }
           .pipeTo(originalSender)
 
         case None =>
-          originalSender ! RESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists"))
+          originalSender ! HuddleRESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"No gameSession (${r.sessionID}) exists"))
       }
 
     // TODO: Revisit the following handler. What is the best way to remember the session that the this

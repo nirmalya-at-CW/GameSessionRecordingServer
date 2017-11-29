@@ -12,7 +12,7 @@ import com.OneHuddle.GamePlaySessionService.jOOQ.generated.Tables._
 
 import java.time._
 
-import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.ComputedGameSession
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.ComputedGameSessionRegSP
 
 import collection.JavaConverters._
 import scala.concurrent.ExecutionContextExecutor
@@ -31,11 +31,12 @@ class GameSessionDBButlerActor(dbAccessURL: String, val dbAccessDispatcher: Exec
 
   override def receive: Receive =  {
 
-    case finishedAndComputedGameSession: ComputedGameSession =>
+    case finishedAndComputedGameSession: ComputedGameSessionRegSP =>
 
       log.info(s"Database action=Insert, GameSession=${finishedAndComputedGameSession.gameSessionUUID} starts.")
 
-      val sessionEndedAtUTC = finishedAndComputedGameSession.completedAt.withZoneSameInstant(ZoneOffset.UTC)
+      val sessionStartedAtUTC = finishedAndComputedGameSession.startedAt.withZoneSameInstant(ZoneOffset.UTC)
+      val sessionEndedAtUTC = finishedAndComputedGameSession.finishedAt.withZoneSameInstant(ZoneOffset.UTC)
 
       val dbRecord = DBActionGameSessionRecord(
         finishedAndComputedGameSession.companyID,
@@ -46,6 +47,7 @@ class GameSessionDBButlerActor(dbAccessURL: String, val dbAccessDispatcher: Exec
         finishedAndComputedGameSession.departmentID,
         finishedAndComputedGameSession.gameType,
         gameName = "NOTSUPPLIED",
+        sessionStartedAtUTC.toLocalDateTime,
         sessionEndedAtUTC.toLocalDateTime,
         finishedAndComputedGameSession.timezoneApplicable,
         finishedAndComputedGameSession.endedBecauseOf.toString,
@@ -76,7 +78,7 @@ object GameSessionDBButlerActor {
 
   def retrieve(
         c: Connection, companyID: String, department: String, gameID: String, playerID: String, gameSessionUUID: String)
-      : List[ComputedGameSession] = {
+      : List[ComputedGameSessionRegSP] = {
 
     val e = DSL.using(c, SQLDialect.MARIADB)
 
@@ -117,10 +119,13 @@ object GameSessionDBButlerActor {
     gameSessionRecord.setGamesessionuuid         (gameSessionRecordableData.gameSessionUUID)
     gameSessionRecord.setBelongstogroup          (gameSessionRecordableData.belongsToGroup)
     gameSessionRecord.setGametype                (gameSessionRecordableData.gameType)
-    gameSessionRecord.setLastplayedoninutc       (Timestamp.valueOf(gameSessionRecordableData.lastPlayedOnInUTC))
+    gameSessionRecord.setGamename                (gameSessionRecordableData.gameName)
+    gameSessionRecord.setStartedatinutc          (Timestamp.valueOf(gameSessionRecordableData.startedAtInUTC))
+    gameSessionRecord.setFinishedatinutc         (Timestamp.valueOf(gameSessionRecordableData.finishedAtInUTC))
     gameSessionRecord.setTimezoneapplicable      (gameSessionRecordableData.timezoneApplicable)
     gameSessionRecord.setEndreason               (gameSessionRecordableData.endReason)
     gameSessionRecord.setScore                   (gameSessionRecordableData.score)
+    gameSessionRecord.setTimetaken               (gameSessionRecordableData.timeTaken)
 
     val result = e.insertInto(GAMESESSIONRECORDS)
        .set(gameSessionRecord)
@@ -138,16 +143,18 @@ object GameSessionDBButlerActor {
 
   private def transformDBRecordToComputedGameSession(l: List[DBActionGameSessionRecord]) = {
 
-    l.map(nextRec => ComputedGameSession(
+    l.map(nextRec => ComputedGameSessionRegSP(
       nextRec.companyID,
       nextRec.belongsToDepartment,
       nextRec.playerID,
       nextRec.gameID,
-      nextRec.gameType,
       nextRec.gameSessionUUID,
       nextRec.belongsToGroup,
       (ZonedDateTime.of(
-        nextRec.lastPlayedOnInUTC,ZoneId.of("UTC"))
+        nextRec.startedAtInUTC,ZoneId.of("UTC"))
+        .withZoneSameInstant(ZoneId.of(nextRec.timezoneApplicable))),
+      (ZonedDateTime.of(
+        nextRec.finishedAtInUTC,ZoneId.of("UTC"))
         .withZoneSameInstant(ZoneId.of(nextRec.timezoneApplicable))),
       nextRec.timezoneApplicable,
       nextRec.score,
@@ -171,6 +178,7 @@ object NonExistentGameSessionRecord extends
     "Unknown GameType",
     "Unknwon GameName",
     Instant.ofEpochMilli(System.currentTimeMillis).atZone(ZoneId.of("UTC")).toLocalDateTime,
+    Instant.ofEpochMilli(System.currentTimeMillis).atZone(ZoneId.of("UTC")).toLocalDateTime,
     "UTC",
     "Unknown EndReason",
     -1,
@@ -178,14 +186,14 @@ object NonExistentGameSessionRecord extends
   )
 
 object NonExistentComputedGameSession extends
-  ComputedGameSession(
+  ComputedGameSessionRegSP(
     "Unknown CompanyID",
     "Unknown Department",
     "Unknown PlayerID",
     "Unknown GameID",
     "Unknown GameSessionUUID",
     "Unknown Group",
-    "Unknown GameType",
+    Instant.ofEpochMilli(System.currentTimeMillis).atZone(ZoneId.of("UTC")),
     Instant.ofEpochMilli(System.currentTimeMillis).atZone(ZoneId.of("UTC")),
     "UTC",
     -1,

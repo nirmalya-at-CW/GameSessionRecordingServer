@@ -99,9 +99,14 @@ class Gamesessionrecords(alias : Name, aliased : Table[GamesessionrecordsRecord]
   val GAMENAME : TableField[GamesessionrecordsRecord, String] = createField("gameName", org.jooq.impl.SQLDataType.VARCHAR(16).defaultValue(org.jooq.impl.DSL.field("NOTSET", org.jooq.impl.SQLDataType.VARCHAR)), "")
 
   /**
-   * The column <code>OneHuddle.GameSessionRecords.lastPlayedOnInUTC</code>.
+   * The column <code>OneHuddle.GameSessionRecords.startedAtInUTC</code>.
    */
-  val LASTPLAYEDONINUTC : TableField[GamesessionrecordsRecord, Timestamp] = createField("lastPlayedOnInUTC", org.jooq.impl.SQLDataType.TIMESTAMP.nullable(false), "")
+  val STARTEDATINUTC : TableField[GamesessionrecordsRecord, Timestamp] = createField("startedAtInUTC", org.jooq.impl.SQLDataType.TIMESTAMP.nullable(false), "")
+
+  /**
+   * The column <code>OneHuddle.GameSessionRecords.finishedAtInUTC</code>.
+   */
+  val FINISHEDATINUTC : TableField[GamesessionrecordsRecord, Timestamp] = createField("finishedAtInUTC", org.jooq.impl.SQLDataType.TIMESTAMP.nullable(false), "")
 
   /**
    * The column <code>OneHuddle.GameSessionRecords.timezoneApplicable</code>.
@@ -122,6 +127,11 @@ class Gamesessionrecords(alias : Name, aliased : Table[GamesessionrecordsRecord]
    * The column <code>OneHuddle.GameSessionRecords.timeTaken</code>.
    */
   val TIMETAKEN : TableField[GamesessionrecordsRecord, Integer] = createField("timeTaken", org.jooq.impl.SQLDataType.INTEGER.nullable(false).defaultValue(org.jooq.impl.DSL.field("-1", org.jooq.impl.SQLDataType.INTEGER)), "")
+
+  /**
+   * The column <code>OneHuddle.GameSessionRecords.outcomeInMPGameSession</code>.
+   */
+  val OUTCOMEINMPGAMESESSION : TableField[GamesessionrecordsRecord, String] = createField("outcomeInMPGameSession", org.jooq.impl.SQLDataType.VARCHAR(16).nullable(false).defaultValue(org.jooq.impl.DSL.field("NOTAPPLICABLE", org.jooq.impl.SQLDataType.VARCHAR)), "")
 
   /**
    * Create a <code>OneHuddle.GameSessionRecords</code> table reference

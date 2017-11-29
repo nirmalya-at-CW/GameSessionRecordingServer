@@ -6,7 +6,7 @@ import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
 import akka.event.LoggingReceive
 import akka.pattern._
 import akka.util.Timeout
-import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.ExternalAPIParams.{ExpandedMessage, RESPGameSessionBodyWhenFailed, RESPGameSessionBodyWhenSuccessful}
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.ExternalAPIParams.{ExpandedMessage, HuddleRESPGameSessionBodyWhenFailed, HuddleRESPGameSessionBodyWhenSuccessful}
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.DBHatch.{DBActionGameSessionRecord, DBActionInsert, DBActionInsertSuccess, DBActionOutcome}
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{DBHatch, DespatchedToLeaderboardAcknowledgement, GameSession, GameSessionEndedByPlayer, HuddleGame, LeaderboardConsumableData}
 import com.OneHuddle.GamePlaySessionService.MariaDBAware.GameSessionDBButlerActor
@@ -14,6 +14,8 @@ import com.OneHuddle.GamePlaySessionService.MariaDBAware.GameSessionDBButlerActo
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.util.{Failure, Success}
 import scala.concurrent.ExecutionContext.Implicits.global
+
+
 /**
   * Created by nirmalya on 11/10/17.
   */
@@ -62,8 +64,8 @@ class GameSessionCustodianActor (
       val confirmation = (gameSessionStateHolderActor ? ev).mapTo[String]
 
       confirmation.onComplete {
-        case Success(d) => originalSender ! RESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200, d))
-        case Failure(e) => originalSender ! RESPGameSessionBodyWhenFailed(ExpandedMessage(1200, e.getMessage))
+        case Success(d) => originalSender ! HuddleRESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200, d))
+        case Failure(e) => originalSender ! HuddleRESPGameSessionBodyWhenFailed(ExpandedMessage(1200, e.getMessage))
       }
 
     case ev: HuddleGame.EvQuestionAnswered =>
@@ -72,8 +74,8 @@ class GameSessionCustodianActor (
       val confirmation = (gameSessionStateHolderActor ? ev).mapTo[String]
 
       confirmation.onComplete {
-        case Success(d) => originalSender ! RESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200, d))
-        case Failure(e) => originalSender ! RESPGameSessionBodyWhenFailed(ExpandedMessage(1200, e.getMessage))
+        case Success(d) => originalSender ! HuddleRESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200, d))
+        case Failure(e) => originalSender ! HuddleRESPGameSessionBodyWhenFailed(ExpandedMessage(1200, e.getMessage))
       }
 
     case ev: HuddleGame.EvPlayingClip  =>
@@ -82,8 +84,8 @@ class GameSessionCustodianActor (
       val confirmation = (gameSessionStateHolderActor ? ev).mapTo[String]
 
       confirmation.onComplete {
-        case Success(d) => originalSender ! RESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200, d))
-        case Failure(e) => originalSender ! RESPGameSessionBodyWhenFailed(ExpandedMessage(1200, e.getMessage))
+        case Success(d) => originalSender ! HuddleRESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200, d))
+        case Failure(e) => originalSender ! HuddleRESPGameSessionBodyWhenFailed(ExpandedMessage(1200, e.getMessage))
       }
 
     case ev: HuddleGame.EvPaused  =>
@@ -92,8 +94,8 @@ class GameSessionCustodianActor (
       val confirmation = (gameSessionStateHolderActor ? ev).mapTo[String]
 
       confirmation.onComplete {
-        case Success(d) => originalSender ! RESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200, d))
-        case Failure(e) => originalSender ! RESPGameSessionBodyWhenFailed(ExpandedMessage(1200, e.getMessage))
+        case Success(d) => originalSender ! HuddleRESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200, d))
+        case Failure(e) => originalSender ! HuddleRESPGameSessionBodyWhenFailed(ExpandedMessage(1200, e.getMessage))
       }
 
     case ev: HuddleGame.EvEndedByPlayer  =>
@@ -102,8 +104,8 @@ class GameSessionCustodianActor (
       val confirmation = (gameSessionStateHolderActor ? ev).mapTo[String]
 
       confirmation.onComplete {
-        case Success(d) => originalSender ! RESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200, d))
-        case Failure(e) => originalSender ! RESPGameSessionBodyWhenFailed(ExpandedMessage(1200, e.getMessage))
+        case Success(d) => originalSender ! HuddleRESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200, d))
+        case Failure(e) => originalSender ! HuddleRESPGameSessionBodyWhenFailed(ExpandedMessage(1200, e.getMessage))
       }
 
       log.debug(s"GameSession ${gameSessionInfo.gameSessionUUID}, ends. Cause: Player finished.")
@@ -115,8 +117,8 @@ class GameSessionCustodianActor (
       val confirmation = (gameSessionStateHolderActor ? ev).mapTo[String]
 
       confirmation.onComplete {
-        case Success(d) => originalSender ! RESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200, d))
-        case Failure(e) => originalSender ! RESPGameSessionBodyWhenFailed(ExpandedMessage(1200, e.getMessage))
+        case Success(d) => originalSender ! HuddleRESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200, d))
+        case Failure(e) => originalSender ! HuddleRESPGameSessionBodyWhenFailed(ExpandedMessage(1200, e.getMessage))
       }
 
       log.info(s"GameSession ${gameSessionInfo.gameSessionUUID}, ends. Cause: Manager forced termination.")
@@ -143,7 +145,6 @@ class GameSessionCustodianActor (
       // for being offered to Leaderboard
       if (ev.computedGameSession.endedBecauseOf == GameSessionEndedByPlayer.toString) {
 
-        println(s" #### emitter actor ${this.leaderBoardInformerActor}")
         val infoForLeaderBoard = LeaderboardConsumableData(
           gameSessionInfo.companyID,
           gameSessionInfo.departmentID,
@@ -169,16 +170,11 @@ class GameSessionCustodianActor (
     case o: DBHatch.DBActionInsertSuccess =>
       log.info(s"${o.i} GameSession records inserted in DB")
 
-
       val updatedConfirmations = allTheseConfirmations.filter(e => e != DBHatch.DBActionInsertSuccess.toString())
-      println(s" **** updatedConfirmations $updatedConfirmations")
 
       if (updatedConfirmations.isEmpty) {
-
-
-        //self ! CloseGameSession
-        context.become(gettingReadyToCloseSessionState)
         self ! CloseGameSession
+        context.become(gettingReadyToCloseSessionState)
       }
       else
         context.become(expectingConfirmationsFromDBLBServicesState(updatedConfirmations))
@@ -187,11 +183,11 @@ class GameSessionCustodianActor (
       log.info(s"GameSession ${gameSessionInfo.gameSessionUUID}, update sent to Leaderboard Service")
 
       val updatedConfirmations = allTheseConfirmations.filter(e => e != DespatchedToLeaderboardAcknowledgement.toString)
-      println(s" **** updatedConfirmations $updatedConfirmations")
+
       if (updatedConfirmations.isEmpty) {
-        //self ! CloseGameSession
-        context.become(gettingReadyToCloseSessionState)
         self ! CloseGameSession
+        context.become(gettingReadyToCloseSessionState)
+
       }
       else
         context.become(expectingConfirmationsFromDBLBServicesState(updatedConfirmations))
@@ -228,9 +224,9 @@ class GameSessionCustodianActor (
       val confirmation = (gameSessionStateHolderActor ? ev).mapTo[String]
       confirmation.onComplete {
           case Success(d) =>
-            originalSender ! RESPGameSessionBodyWhenSuccessful(ExpandedMessage(2100, d),Some(Map("gameSessionID" -> gameSessionInfo.gameSessionUUID)))
+            originalSender ! HuddleRESPGameSessionBodyWhenSuccessful(ExpandedMessage(2100, d),Some(Map("gameSessionID" -> gameSessionInfo.gameSessionUUID)))
           case Failure(e) =>
-            originalSender ! RESPGameSessionBodyWhenFailed(ExpandedMessage(1200, e.getMessage))
+            originalSender ! HuddleRESPGameSessionBodyWhenFailed(ExpandedMessage(1200, e.getMessage))
       }
 
       context.become(gamePlayIsOnState)

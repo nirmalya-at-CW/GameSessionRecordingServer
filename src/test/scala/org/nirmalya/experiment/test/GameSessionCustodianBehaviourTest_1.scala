@@ -9,8 +9,8 @@ import akka.testkit.{EventFilter, ImplicitSender, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
 import com.OneHuddle.GamePlaySessionService.GameSessionCustodianActor
 
-import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.ExternalAPIParams.{ExpandedMessage, RESPGameSessionBodyWhenSuccessful}
-import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{ComputedGameSession, EmittedWhenGameSessionIsFinished, GameSession, GameSessionEndedByPlayer, GameSessionEndedByTimeOut, HuddleGame, LeaderboardConsumableData, QuestionAnswerTuple}
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.ExternalAPIParams.{ExpandedMessage, HuddleRESPGameSessionBodyWhenSuccessful}
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{ComputedGameSessionRegSP, EmittedWhenGameSessionIsFinished, GameSession, GameSessionEndedByPlayer, GameSessionEndedByTimeOut, HuddleGame, LeaderboardConsumableData, QuestionAnswerTuple}
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.HuddleGame.EvInitiated
 import com.OneHuddle.GamePlaySessionService.MariaDBAware.{GameSessionDBButlerActor, NonExistentComputedGameSession, NonExistentGameSessionRecord}
 
@@ -83,7 +83,7 @@ class GameSessionCustodianBehaviourTest_1  extends TestKit(ActorSystem("ActorSys
 
       custodian ! evinitiated
 
-      expectMsg(RESPGameSessionBodyWhenSuccessful(ExpandedMessage(2100, "Initiated"),Some(Map("gameSessionID" -> gameSessionInfo.gameSessionUUID))))
+      expectMsg(HuddleRESPGameSessionBodyWhenSuccessful(ExpandedMessage(2100, "Initiated"),Some(Map("gameSessionID" -> gameSessionInfo.gameSessionUUID))))
 
     }
   }
@@ -124,23 +124,23 @@ class GameSessionCustodianBehaviourTest_1  extends TestKit(ActorSystem("ActorSys
 
     custodian ! evInitiated
 
-    expectMsg(RESPGameSessionBodyWhenSuccessful(ExpandedMessage(2100, "Initiated"), Some(Map("gameSessionID" -> gameSessionInfo.gameSessionUUID))))
+    expectMsg(HuddleRESPGameSessionBodyWhenSuccessful(ExpandedMessage(2100, "Initiated"), Some(Map("gameSessionID" -> gameSessionInfo.gameSessionUUID))))
 
     custodian ! evQuizIsFinalized
 
-    expectMsg(RESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200, "Prepared")))
+    expectMsg(HuddleRESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200, "Prepared")))
 
     custodian ! evQuestionAnswered_1
 
-    expectMsg(RESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200, "QuestionAnswered")))
+    expectMsg(HuddleRESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200, "QuestionAnswered")))
 
     custodian ! evQuestionAnswered_2
 
-    expectMsg(RESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200, "QuestionAnswered")))
+    expectMsg(HuddleRESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200, "QuestionAnswered")))
 
     custodian ! evSessionEndedByPlayer
 
-    expectMsg(RESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200, "Ended")))
+    expectMsg(HuddleRESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200, "Ended")))
 
     leaderboardInformerProbe.expectMsg(
       Duration(5, "seconds"),

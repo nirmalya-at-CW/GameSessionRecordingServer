@@ -7,7 +7,7 @@ import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.ExternalAPIParams._
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{GameSession, QuestionAnswerTuple}
-import com.OneHuddle.GamePlaySessionService.{GameSessionSPOCActor}
+import com.OneHuddle.GamePlaySessionService.GameSessionSPOCActor
 import org.nirmalya.experiment.test.common.{DummyLeaderBoardServiceGatewayActor, StopSystemAfterAll}
 import org.scalatest.{BeforeAndAfterAll, MustMatchers, WordSpecLike}
 
@@ -73,7 +73,7 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
                       questionaAndAnswers(0).timeTakenToAnswerAtFE
                   )
 
-      expectMsg(RESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"No gameSession (${invalidGameSession.toString}) exists")))
+      expectMsg(HuddleRESPGameSessionBodyWhenFailed(ExpandedMessage(1300, s"No gameSession (${invalidGameSession.toString}) exists")))
     }
 
     "confirm that a GamePlaySession Actor has initiated" in {
@@ -85,7 +85,7 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
       spocActor ! req
 
       expectMsg(
-        RESPGameSessionBodyWhenSuccessful(
+        HuddleRESPGameSessionBodyWhenSuccessful(
                     ExpandedMessage(2100,"Initiated"),
                     Some(Map("gameSessionID" -> req.gameSessionUUID))
         )
@@ -102,7 +102,7 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
       spocActor ! reqStart
 
       expectMsg(
-        RESPGameSessionBodyWhenSuccessful(
+        HuddleRESPGameSessionBodyWhenSuccessful(
           ExpandedMessage(2100,"Initiated"),
           Some(Map("gameSessionID" -> reqStart.gameSessionUUID))
         )
@@ -112,14 +112,14 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
 
       spocActor ! reqQuizSetup
 
-      expectMsg(RESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200,"Prepared")))
+      expectMsg(HuddleRESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200,"Prepared")))
 
       val reqPause = REQPauseAGameWith(reqStart.gameSessionUUID)
 
       spocActor ! reqPause
 
       expectMsgPF (Duration(3, "second")) {
-        case m:RESPGameSessionBodyWhenSuccessful =>
+        case m:HuddleRESPGameSessionBodyWhenSuccessful =>
           m.opSuccess == true &&
           m.message.successId == 2200 &&
           m.message.description ==  ("Paused") &&
@@ -127,7 +127,7 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
       }
     }
 
-    "stops itself automatically after playing and then remaining inactive for certain time" in {
+    "stop GameSession Actor and itself, automatically after playing and then remaining inactive for certain time" in {
 
       val spocActor = system.actorOf(GameSessionSPOCActor(emitterActor),"SPOCtActorForTest-3")
 
@@ -139,7 +139,7 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
       spocActor ! reqStart
 
       expectMsg(
-        RESPGameSessionBodyWhenSuccessful(
+        HuddleRESPGameSessionBodyWhenSuccessful(
           ExpandedMessage(2100,"Initiated"),
           Some(Map("gameSessionID" -> reqStart.gameSessionUUID))
         )
@@ -149,14 +149,14 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
 
       spocActor ! reqQuizSetup
 
-      expectMsg(RESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200,"Prepared")))
+      expectMsg(HuddleRESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200,"Prepared")))
 
       val reqPause = REQPauseAGameWith(reqStart.gameSessionUUID)
 
       spocActor ! reqPause
 
       expectMsgPF (Duration(3, "second")) {
-        case m:RESPGameSessionBodyWhenSuccessful =>
+        case m:HuddleRESPGameSessionBodyWhenSuccessful =>
           m.opSuccess == true &&
             m.message.successId == 2200 &&
             m.message.description ==  ("Paused") &&
@@ -175,7 +175,7 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
       spocActor ! reqPlay
 
       expectMsgPF (Duration(3, "second")) {
-        case m:RESPGameSessionBodyWhenSuccessful =>
+        case m:HuddleRESPGameSessionBodyWhenSuccessful =>
           m.opSuccess == true &&
             m.message.successId == 2200 &&
             m.message.description ==  ("QuestionAnswered") &&
@@ -203,7 +203,7 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
 
       expectMsgPF(Duration(1, "second")) {
 
-        case m: RESPGameSessionBodyWhenFailed =>
+        case m: HuddleRESPGameSessionBodyWhenFailed =>
           m.opSuccess == true               &&
           m.message.successId     == 1300   &&
           m.message.description   == s"No gameSession (${reqStart.gameSessionUUID}) exists" &&

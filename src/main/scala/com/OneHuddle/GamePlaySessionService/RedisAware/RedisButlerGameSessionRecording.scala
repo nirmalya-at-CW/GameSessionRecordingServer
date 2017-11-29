@@ -10,7 +10,7 @@ import org.json4s.native.JsonMethods._
 import org.json4s.native.Serialization._
 import org.slf4j.LoggerFactory
 
-import scala.concurrent.Future
+
 import scala.util.{Failure, Success}
 
 

@@ -8,12 +8,11 @@ import akka.actor.ActorSystem
 import akka.testkit.{EventFilter, ImplicitSender, TestKit, TestProbe}
 import com.OneHuddle.GamePlaySessionService.GameSessionCustodianActor
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.DBHatch.DBActionGameSessionRecord
-import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.ExternalAPIParams.{ExpandedMessage, RESPGameSessionBodyWhenSuccessful}
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.ExternalAPIParams.{ExpandedMessage, HuddleRESPGameSessionBodyWhenSuccessful}
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.HuddleGame.EvInitiated
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{GameSession, GameSessionEndedByTimeOut, HuddleGame, QuestionAnswerTuple}
-import com.OneHuddle.GamePlaySessionService.MariaDBAware.NonExistentGameSessionRecord
+import com.OneHuddle.GamePlaySessionService.MariaDBAware.{GameSessionDBButlerActor, NonExistentGameSessionRecord}
 import com.typesafe.config.ConfigFactory
-
 import com.OneHuddle.GamePlaySessionService.jOOQ.generated.Tables._
 import org.jooq.SQLDialect
 import org.jooq.impl.DSL
@@ -21,8 +20,6 @@ import org.nirmalya.experiment.test.common._
 import org.scalatest.{BeforeAndAfterAll, MustMatchers, WordSpecLike}
 
 import collection.JavaConverters._
-
-
 import scala.concurrent.duration.Duration
 
 /**
@@ -143,19 +140,19 @@ class GameSessionCustodianBehaviourTest_2  extends TestKit(ActorSystem(
 
       custodian ! evInitiated
 
-      expectMsg(RESPGameSessionBodyWhenSuccessful(ExpandedMessage(2100, "Initiated"),Some(Map("gameSessionID" -> gameSessionInfo.gameSessionUUID))))
+      expectMsg(HuddleRESPGameSessionBodyWhenSuccessful(ExpandedMessage(2100, "Initiated"),Some(Map("gameSessionID" -> gameSessionInfo.gameSessionUUID))))
 
       custodian ! evQuizIsFinalized
 
-      expectMsg(RESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200, "Prepared")))
+      expectMsg(HuddleRESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200, "Prepared")))
 
       custodian ! evQuestionAnswered_1
 
-      expectMsg(RESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200, "QuestionAnswered")))
+      expectMsg(HuddleRESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200, "QuestionAnswered")))
 
       custodian ! evQuestionAnswered_2
 
-      expectMsg(RESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200, "QuestionAnswered")))
+      expectMsg(HuddleRESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200, "QuestionAnswered")))
 
 
 
@@ -165,19 +162,19 @@ class GameSessionCustodianBehaviourTest_2  extends TestKit(ActorSystem(
 
       val k = fetchGameSessionFromDB(gameSessionInfo) // 'k' is a list
 
-      println(s"k.head.score [${k.head.score}]")
+      println(s"k.head.score [${k.head.totalPointsObtained}]")
       println(s"total correct answers [${evQuestionAnswered_1.questionAndAnswer.points + evQuestionAnswered_2.questionAndAnswer.points}]")
 
       assert(
         k != NonExistentGameSessionRecord &&
           k.tail.isEmpty                    &&  // Because we expect only one record with corresponding keyfields to exist
           k.head.companyID             == gameSessionInfo.companyID            &&
-          k.head.belongsToDepartment   == gameSessionInfo.departmentID         &&
+          k.head.departmentID          == gameSessionInfo.departmentID         &&
           k.head.gameID                == gameSessionInfo.gameID               &&
           k.head.playerID              == gameSessionInfo.playerID             &&
           k.head.gameSessionUUID       == gameSessionInfo.gameSessionUUID      &&
-          k.head.endReason             == GameSessionEndedByTimeOut.toString   &&
-          k.head.score                 == (evQuestionAnswered_1.questionAndAnswer.points + evQuestionAnswered_2.questionAndAnswer.points)
+          k.head.endedBecauseOf        == GameSessionEndedByTimeOut.toString   &&
+          k.head.totalPointsObtained   == (evQuestionAnswered_1.questionAndAnswer.points + evQuestionAnswered_2.questionAndAnswer.points)
       )
 
     }
@@ -188,7 +185,7 @@ class GameSessionCustodianBehaviourTest_2  extends TestKit(ActorSystem(
   fetchGameSessionFromDB(gameSessionInfo: GameSession) = {
 
     val c = DriverManager.getConnection(dbAccessURL)
-    val e = DSL.using(c, SQLDialect.MARIADB)
+    /*val e = DSL.using(c, SQLDialect.MARIADB)
     val x = GAMESESSIONRECORDS as "x"
 
     val k = e.selectFrom(GAMESESSIONRECORDS)
@@ -202,7 +199,20 @@ class GameSessionCustodianBehaviourTest_2  extends TestKit(ActorSystem(
           .toList
 
     c.close
-    if (k.isEmpty) List(NonExistentGameSessionRecord) else k
+    if (k.isEmpty) List(NonExistentGameSessionRecord) else k*/
+
+    val k = GameSessionDBButlerActor
+      .retrieve(
+        c,
+        gameSessionInfo.companyID,
+        gameSessionInfo.departmentID,
+        gameSessionInfo.gameID,
+        gameSessionInfo.playerID,
+        gameSessionInfo.gameSessionUUID
+      )
+
+    c.close
+    k
   }
 
 

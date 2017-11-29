@@ -2,8 +2,8 @@ package com.OneHuddle.GamePlaySessionService
 
 import java.time.{LocalDateTime, ZonedDateTime}
 
-
-import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.ExternalAPIParams.{REQStartAGameWith, RESPGameSessionBody}
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.ExternalAPIParams.{HuddleRESPGameSessionBody, REQStartAGameWith}
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.MultiPlayerGameResult.MultiPlayerGameResult
 import org.json4s.{DefaultFormats, Formats, ShortTypeHints}
 import org.json4s.native.Serialization
 import de.heikoseeberger.akkahttpjson4s.Json4sSupport
@@ -15,6 +15,11 @@ import de.heikoseeberger.akkahttpjson4s.Json4sSupport
 
 
 object GameSessionHandlingServiceProtocol {
+
+  object MultiPlayerGameResult extends Enumeration {
+    type MultiPlayerGameResult = Value
+    val LOST, WON = Value
+  }
 
   object ExternalAPIParams {
 
@@ -43,9 +48,13 @@ object GameSessionHandlingServiceProtocol {
     case class ExpandedMessage (successId: Int, description: String)
     case class Supplementary(dataCarried: Map[String,String])
 
-    sealed trait RESPGameSessionBody { val opSuccess: Boolean }
-    case class RESPGameSessionBodyWhenSuccessful(message: ExpandedMessage, contents: Option[Map[String,String]]=None, opSuccess: Boolean = true) extends RESPGameSessionBody
-    case class RESPGameSessionBodyWhenFailed(message: ExpandedMessage, contents: Option[Map[String,String]]=None, opSuccess: Boolean = false) extends RESPGameSessionBody
+    sealed trait HuddleRESPGameSessionBody { val opSuccess: Boolean }
+    case class   HuddleRESPGameSessionBodyWhenSuccessful(
+                    message: ExpandedMessage, contents: Option[Map[String,String]]=None, opSuccess: Boolean = true)
+                 extends HuddleRESPGameSessionBody
+    case class   HuddleRESPGameSessionBodyWhenFailed(
+                   message: ExpandedMessage, contents: Option[Map[String,String]]=None, opSuccess: Boolean = false)
+                 extends HuddleRESPGameSessionBody
   }
 
   sealed trait GameSessionEndingReason
@@ -81,13 +90,59 @@ object GameSessionHandlingServiceProtocol {
   }
 
 
+  trait ComputedGameSession {
+    val companyID: String
+    val departmentID: String
+    val playerID: String
+    val gameID: String
+    val gameType: String
+    val gameSessionUUID: String
+    val groupID: String
+    val startedAt: ZonedDateTime
+    val finishedAt: ZonedDateTime
+    val timezoneApplicable: String
+    val totalPointsObtained: Int
+    val timeTakenToFinish: Int
+    val endedBecauseOf: String
 
-  case class ComputedGameSession (
-               companyID: String, departmentID: String, playerID: String, gameID: String,
-               gameType: String = "SP", gameSessionUUID: String, groupID: String,
-               completedAt: ZonedDateTime, timezoneApplicable: String,
+  }
+  case class ComputedGameSessionRegSP(
+               companyID: String,departmentID: String, playerID: String, gameID: String,
+               gameSessionUUID: String, groupID: String,
+               startedAt: ZonedDateTime, finishedAt: ZonedDateTime, timezoneApplicable: String,
                totalPointsObtained: Int, timeTakenToFinish: Int, endedBecauseOf: String
-             )
+             ) extends ComputedGameSession {
+    override val gameType = "REGSP"
+  }
+
+  case class ComputedGameSessionRegMP(
+               companyID: String,departmentID: String, playerID: String, gameID: String,
+               gameSessionUUID: String, groupID: String,
+               startedAt: ZonedDateTime, finishedAt: ZonedDateTime, timezoneApplicable: String,
+               totalPointsObtained: Int, timeTakenToFinish: Int, statusWinOrLose: MultiPlayerGameResult,
+               endedBecauseOf: String
+             ) extends ComputedGameSession {
+    override val gameType = "REGMP"
+  }
+
+  case class ComputedGameSessionMiniSP(
+               companyID: String,departmentID: String, playerID: String, gameID: String,
+               gameSessionUUID: String, groupID: String,
+               startedAt: ZonedDateTime, finishedAt: ZonedDateTime, timezoneApplicable: String,
+               totalPointsObtained: Int, timeTakenToFinish: Int, endedBecauseOf: String
+             ) extends ComputedGameSession {
+    override val gameType = "MINISP"
+  }
+
+  case class ComputedGameSessionMiniMP(
+               companyID: String,departmentID: String, playerID: String, gameID: String,
+               gameSessionUUID: String, groupID: String,
+               startedAt: ZonedDateTime, finishedAt: ZonedDateTime, timezoneApplicable: String,
+               totalPointsObtained: Int, timeTakenToFinish: Int, statusWinOrLose: MultiPlayerGameResult,
+               endedBecauseOf: String
+             ) extends ComputedGameSession {
+    override val gameType = "MINIMP"
+  }
 
   case class LeaderboardConsumableData(
                companyID: String, departmentID: String, gameID: String, playerID: String,
@@ -117,6 +172,7 @@ object GameSessionHandlingServiceProtocol {
   case class CompleteGamePlaySessionHistory(elems: List[GameInfoTupleInREDIS])
   object NonExistingCompleteGamePlaySessionHistory extends CompleteGamePlaySessionHistory(elems = List.empty)
 
+  // As required by json4s library that we are using for (un)jsonification operations
   implicit val formats_2 = Serialization.formats(
     ShortTypeHints(
       List(
@@ -131,7 +187,8 @@ object GameSessionHandlingServiceProtocol {
         classOf[GameSessionCompositeID],
         classOf[REQStartAGameWith],
         classOf[RedisRecordingStatus],
-        classOf[RESPGameSessionBody]
+        classOf[HuddleRESPGameSessionBody],
+        classOf[LeaderboardConsumableData]
       )
     )
   )
@@ -139,8 +196,9 @@ object GameSessionHandlingServiceProtocol {
   object HuddleGame {
 
     sealed trait HuddleGameFSMData
-    case object DataToBeginWith extends  HuddleGameFSMData  // Not used at this point in time
-    case class  DataToEndWith(sessionEndedAt: Long) extends HuddleGameFSMData
+    case object UninitializedDataToBeginWith extends  HuddleGameFSMData  // Not used at this point in time
+    case class  DataToContinueWith(sessionBeganAt: Long) extends  HuddleGameFSMData
+    case class  DataToEndWith(sessionBeganAt: Long, sessionEndedAt: Long) extends HuddleGameFSMData
 
     sealed trait HuddleGameSessionTerminationEvent { val reasonWhySessionEnds: GameSessionEndingReason }
     sealed trait HuddleGameEvent
@@ -165,7 +223,7 @@ object GameSessionHandlingServiceProtocol {
     case object  EvGamePlayRecordSoFarRequired extends HuddleGameEvent
     case object  EvGameShouldHaveStartedByNow extends HuddleGameEvent
     case object  EvGameShouldHaveEndedByNow   extends HuddleGameEvent
-    case class   EvGameFinishedAndScored (computedGameSession: ComputedGameSession) extends HuddleGameEvent
+    case class   EvGameFinishedAndScored (computedGameSession: ComputedGameSessionRegSP) extends HuddleGameEvent
     case object  EvGameSessionSaved extends HuddleGameEvent
     case object  EvGameSessionTerminationIndicated extends HuddleGameEvent
     case object  EvStateHolderIsGoingDown extends HuddleGameEvent
@@ -187,8 +245,11 @@ object GameSessionHandlingServiceProtocol {
 
   case class RedisRecordingStatus(details: String)
 
-  case class EmittedWhenGameSessionIsFinished(contents: String)
-  case object DespatchedToLeaderboardAcknowledgement
+  case class  EmittedWhenGameSessionIsFinished(contents: String)
+  case class  DespatchedToLeaderboardAcknowledgement (
+                 val statusHTTP: Int, val statusTextHTTP: String, val errorReason: Option[String] = None
+
+                                                     )
 
 
   trait RedisSessionStatus
@@ -197,18 +258,18 @@ object GameSessionHandlingServiceProtocol {
 
   object DBHatch {
 
-          case class DBActionGameSessionRecord(
-                  companyID: String, belongsToDepartment: String, playerID: String, gameID: String,
-                  gameSessionUUID: String, belongsToGroup: String, gameType: String = "SP", gameName: String = "NOTSUPPLIED",
-                  lastPlayedOnInUTC: LocalDateTime, timezoneApplicable: String, endReason: String,
-                  score: Int, timeTaken: Int)
+    case class DBActionGameSessionRecord(
+          companyID: String, belongsToDepartment: String, playerID: String, gameID: String,
+          gameSessionUUID: String, belongsToGroup: String, gameType: String = "REGSP", gameName: String = "NOTSUPPLIED",
+          startedAtInUTC: LocalDateTime, finishedAtInUTC: LocalDateTime, timezoneApplicable: String, endReason: String,
+          score: Int, timeTaken: Int, outcomeInMPGameSession: String = "NOTAPPLICABLE")
 
 
     case class DBActionPlayerPerformanceRecord(
-                  companyID: String, belongsToDepartment: String, playerID: String, gameID: String,
-                  gameType: String = "SP",
-                  lastPlayedOn: LocalDateTime, timezoneApplicable: String,
-                  pointsObtained: Int, timeTaken: Int, winsAchieved: Int)
+          companyID: String, belongsToDepartment: String, playerID: String, gameID: String,
+          gameType: String = "SP",
+          lastPlayedOn: LocalDateTime, timezoneApplicable: String,
+          pointsObtained: Int, timeTaken: Int, winsAchieved: Int)
     
     sealed trait DBAction
     case class   DBActionInsert(r:DBActionGameSessionRecord) extends DBAction

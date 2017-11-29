@@ -28,7 +28,7 @@ class GameSessionStateHolderActor(val cleanDataOnExit: Boolean,
   // the Actor is destroyed.
   val gameNeverStartedIndicator = context.system.scheduler.scheduleOnce(this.maxGameSessionLifetime, self, HuddleGame.EvGameShouldHaveStartedByNow)
 
-   startWith(GameSessionYetToStartState, DataToBeginWith)
+   startWith(GameSessionYetToStartState, UninitializedDataToBeginWith)
 
    when (HuddleGame.GameSessionYetToStartState) {
 
@@ -39,16 +39,16 @@ class GameSessionStateHolderActor(val cleanDataOnExit: Boolean,
 
           // We need to set up a separate timer, to indicate when the maximum time for this session is up
           context.system.scheduler.scheduleOnce(this.maxGameSessionLifetime, self, HuddleGame.EvGameShouldHaveEndedByNow)
-          goto (HuddleGame.GameSessionIsBeingPreparedState) // using DataToEndWith(gameInitiated.gameSession)
+          goto (HuddleGame.GameSessionIsBeingPreparedState) using DataToContinueWith(gameInitiated.startedAt)
 
-     case Event(HuddleGame.EvGameShouldHaveStartedByNow, _ ) =>
+     case Event(HuddleGame.EvGameShouldHaveStartedByNow, d: DataToContinueWith ) =>
 
        val sessionEndsAt = System.currentTimeMillis
        redisButler.recordEndOfTheGame(sessionEndsAt, GameSessionCreatedButNotStarted, -1, seededWithSession)
        log.info(s"GameSession = ${seededWithSession.gameSessionUUID}, not started after ${maxGameSessionLifetime} seconds, preparing for termination.")
        context.parent ! HuddleGame.EvEndedByTimeout(sessionEndsAt)
        self ! HuddleGame.EvSessionCleanupIndicated(sessionEndsAt,GameSessionCreatedButNotStarted)
-       goto (HuddleGame.GameSessionIsWrappingUpState)
+       goto (HuddleGame.GameSessionIsWrappingUpState) using DataToEndWith(d.sessionBeganAt,sessionEndsAt)
 
    }
 
@@ -86,7 +86,7 @@ class GameSessionStateHolderActor(val cleanDataOnExit: Boolean,
        sender ! redisButler.recordAPauseOfTheGame(paused.pausedAt, seededWithSession).details
        goto (HuddleGame.GameSessionIsPausedState)
 
-     case Event(ended: HuddleGame.EvEndedByPlayer, _)           =>
+     case Event(ended: HuddleGame.EvEndedByPlayer, d: DataToContinueWith)           =>
 
        sender ! redisButler.recordEndOfTheGame(
                                ended.endedAt,
@@ -95,7 +95,7 @@ class GameSessionStateHolderActor(val cleanDataOnExit: Boolean,
                                seededWithSession
                              ).details
        self ! HuddleGame.EvSessionCleanupIndicated(ended.endedAt, ended.reasonWhySessionEnds)
-       goto (HuddleGame.GameSessionIsWrappingUpState)
+       goto (HuddleGame.GameSessionIsWrappingUpState) using DataToEndWith(d.sessionBeganAt,ended.endedAt)
 
    }
 
@@ -125,8 +125,7 @@ class GameSessionStateHolderActor(val cleanDataOnExit: Boolean,
        sender ! redisButler.recordAPauseOfTheGame(paused.pausedAt, seededWithSession).details
        goto (HuddleGame.GameSessionIsPausedState)
 
-     case Event(ended: HuddleGame.EvEndedByPlayer, _)    =>
-
+     case Event(ended: HuddleGame.EvEndedByPlayer, d: DataToContinueWith) =>
        sender ! redisButler.recordEndOfTheGame(
                              ended.endedAt,
                              ended.reasonWhySessionEnds,
@@ -134,7 +133,7 @@ class GameSessionStateHolderActor(val cleanDataOnExit: Boolean,
                              seededWithSession
                            ).details
        self ! HuddleGame.EvSessionCleanupIndicated(ended.endedAt, ended.reasonWhySessionEnds)
-       goto (HuddleGame.GameSessionIsWrappingUpState)
+       goto (HuddleGame.GameSessionIsWrappingUpState) using DataToEndWith(d.sessionBeganAt, ended.endedAt)
    }
 
    when (HuddleGame.GameSessionIsPausedState)  {
@@ -153,9 +152,8 @@ class GameSessionStateHolderActor(val cleanDataOnExit: Boolean,
         sender ! redisButler.recordThatClipIsPlayed(aboutToPlayClip.beganPlayingAt, aboutToPlayClip.clipName, seededWithSession).details
         goto (HuddleGame.GameSessionIsContinuingState)
 
-      case Event(ended: HuddleGame.EvEndedByPlayer, _)                     =>
+      case Event(ended: HuddleGame.EvEndedByPlayer, d: DataToContinueWith)                     =>
 
-        log.debug(s"EndedByPlayer ${ended.reasonWhySessionEnds} ....")
         sender ! redisButler.recordEndOfTheGame(
                                 ended.endedAt,
                                 ended.reasonWhySessionEnds,
@@ -163,12 +161,12 @@ class GameSessionStateHolderActor(val cleanDataOnExit: Boolean,
                                 seededWithSession
                              ).details
         self ! HuddleGame.EvSessionCleanupIndicated(ended.endedAt, ended.reasonWhySessionEnds)
-        goto (HuddleGame.GameSessionIsWrappingUpState)
+        goto (HuddleGame.GameSessionIsWrappingUpState) using DataToEndWith(d.sessionBeganAt, ended.endedAt)
     }
 
    when (HuddleGame.GameSessionIsWrappingUpState) {
 
-      case Event(cleanUpRequired: EvSessionCleanupIndicated, _) =>
+      case Event(cleanUpRequired: EvSessionCleanupIndicated, d: DataToEndWith) =>
 
         val entireGameSessionRecord = redisButler.retrieveSessionHistory(seededWithSession,"SessionHistory")
 
@@ -188,19 +186,21 @@ class GameSessionStateHolderActor(val cleanDataOnExit: Boolean,
           (accumulator._1 + scoreForQ, accumulator._2 + timeTakenForQ)
         })
 
+        val sessionBeganAtTimezoneApplied =
+          Instant.ofEpochMilli(d.sessionBeganAt).atZone(ZoneId.of(seededWithSession.playedInTimezone))
         val sessionEndedAtTimezoneApplied =
-          Instant.ofEpochMilli(cleanUpRequired.endedAt).atZone(ZoneId.of(seededWithSession.playedInTimezone))
+          Instant.ofEpochMilli(d.sessionEndedAt).atZone(ZoneId.of(seededWithSession.playedInTimezone))
 
         // parent == custodian of this state-holder
         context.parent ! EvGameFinishedAndScored(
-                            ComputedGameSession(
+                            ComputedGameSessionRegSP(
                                 seededWithSession.companyID,
                                 seededWithSession.departmentID,
                                 seededWithSession.playerID,
                                 seededWithSession.gameID,
-                                seededWithSession.gameType,
                                 seededWithSession.gameSessionUUID,
                                 seededWithSession.groupID,
+                                sessionBeganAtTimezoneApplied,
                                 sessionEndedAtTimezoneApplied,
                                 seededWithSession.playedInTimezone,
                                 totalScoreAndTime._1,
@@ -215,10 +215,10 @@ class GameSessionStateHolderActor(val cleanDataOnExit: Boolean,
 
    when (HuddleGame.GameSessionIsWaitingForInstructionToClose) {
 
-     case Event(HuddleGame.EvGameSessionTerminationIndicated,_) =>
+     case Event(HuddleGame.EvGameSessionTerminationIndicated, d: DataToEndWith) =>
          //TODO: Replace the if-check below, with a HOF
          if (!this.cleanDataOnExit) redisButler.removeGameSessionFromREDIS(seededWithSession)
-         stop(FSM.Normal, DataToEndWith(System.currentTimeMillis()))
+         stop(FSM.Normal, d)
 
      case m: Any => log.info(s"Unknown message $m, received while waiting for instruction to close.")
                     stay
@@ -226,49 +226,38 @@ class GameSessionStateHolderActor(val cleanDataOnExit: Boolean,
 
   whenUnhandled {
 
+    case Event(HuddleGame.EvGamePlayRecordSoFarRequired, d: DataToContinueWith) =>
+      sender ! redisButler.extractCurrentGamePlayRecord(seededWithSession).details
+      stay
 
-    case Event(m, d) =>
+    case Event (m @ HuddleGame.EvForceEndedByManager(endedAt, _), d: DataToContinueWith)  =>
 
-      m match  {
+      val endAction = redisButler.recordEndOfTheGame(m.endedAt, m.reasonWhySessionEnds, -1, seededWithSession)
 
-        case EvGamePlayRecordSoFarRequired =>
-          sender ! redisButler.extractCurrentGamePlayRecord(seededWithSession).details
-          stay
-
-        case m:EvForceEndedByManager =>
-
-          val endAction = redisButler.recordEndOfTheGame(m.endedAt, m.reasonWhySessionEnds, -1, seededWithSession)
-
-          if (endAction.details == "Ended") {
-            log.info(s"GameSession ($seededWithSession), at ${m.endedAt}, forced to end by manager ${m.managerName}")
-            sender ! endAction.details
-            self ! EvSessionCleanupIndicated(m.endedAt,GameSessionEndedByManager)
-            goto (GameSessionIsWrappingUpState)
-          }
-          else {
-            log.info(s"GameSession ($seededWithSession), at (${m.endedAt}), failed to end, was instructed by manager (${m.managerName})")
-            sender ! endAction.details
-            stay
-          }
-
-        case EvGameShouldHaveEndedByNow =>
-
-          val sessionEndsAt = System.currentTimeMillis
-          redisButler.recordEndOfTheGame(sessionEndsAt, GameSessionEndedByTimeOut, -1, seededWithSession)
-
-          // parent == custodian of this state-holder
-          context.parent ! EvEndedByTimeout(sessionEndsAt)
-          self ! HuddleGame.EvSessionCleanupIndicated(sessionEndsAt,GameSessionEndedByTimeOut)
-          goto (HuddleGame.GameSessionIsWrappingUpState)
-
-        case _  =>
-          log.info(s"Unknown message of type ${m.getClass}, in ${this.stateName}")
-          stay
+      if (endAction.details == "Ended") {
+        log.info(s"GameSession ($seededWithSession), at ${m.endedAt}, forced to end by manager ${m.managerName}")
+        sender ! endAction.details
+        self ! EvSessionCleanupIndicated(m.endedAt,GameSessionEndedByManager)
+        goto (GameSessionIsWrappingUpState) using DataToEndWith(d.sessionBeganAt, m.endedAt)
       }
+      else {
+        log.info(s"GameSession ($seededWithSession), at (${m.endedAt}), failed to end, was instructed by manager (${m.managerName})")
+        sender ! endAction.details
+        stay
+      }
+
+    case Event(HuddleGame.EvGameShouldHaveEndedByNow, d: DataToContinueWith) =>
+
+      val sessionEndsAt = System.currentTimeMillis
+      redisButler.recordEndOfTheGame(sessionEndsAt, GameSessionEndedByTimeOut, -1, seededWithSession)
+
+      // parent == custodian of this state-holder
+      context.parent ! EvEndedByTimeout(sessionEndsAt)
+      self ! HuddleGame.EvSessionCleanupIndicated(sessionEndsAt,GameSessionEndedByTimeOut)
+      goto (HuddleGame.GameSessionIsWrappingUpState) using DataToEndWith(d.sessionBeganAt, sessionEndsAt)
 
     case m: Any => log.info(s"Unknown message of type ${m.getClass}, in ${this.stateName}")
       stay
-
 
   }
   onTransition {

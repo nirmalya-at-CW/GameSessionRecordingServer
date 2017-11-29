@@ -9,22 +9,26 @@
 /*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
-DROP TABLE IF EXISTS `PlayerPerformance`;
+DROP TABLE IF EXISTS `GameSessionRecords`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `PlayerPerformance` (
-  `recordID` int(12) NOT NULL AUTO_INCREMENT,
-  `companyID` varchar(32) COLLATE utf8_bin NOT NULL DEFAULT 'NOTSET',
-  `belongsToDepartment` varchar(32) COLLATE utf8_bin NOT NULL DEFAULT 'NOTSET',
+CREATE TABLE `GameSessionRecords` (
+  `companyID` varchar(16) COLLATE utf8_bin NOT NULL,
+  `belongsToDepartment` varchar(28) COLLATE utf8_bin NOT NULL DEFAULT 'NOTSET',
   `playerID` varchar(16) COLLATE utf8_bin NOT NULL DEFAULT 'NOTSET',
   `gameID` varchar(16) COLLATE utf8_bin NOT NULL DEFAULT 'NOTSET',
-  `gameType` varchar(8) COLLATE utf8_bin NOT NULL DEFAULT 'NOTSET',
-  `lastPlayedOn` datetime NOT NULL,
-  `timezoneApplicable` varchar(16) COLLATE utf8_bin NOT NULL DEFAULT 'NOTSET',
-  `pointsObtained` int(11) NOT NULL,
-  `timeTaken` int(11) NOT NULL,
-  `winsAchieved` int(11) NOT NULL DEFAULT '0',
-  PRIMARY KEY (`recordID`,`companyID`,`belongsToDepartment`,`playerID`,`gameID`,`gameType`,`lastPlayedOn`,`timezoneApplicable`)
+  `gameSessionUUID` varchar(48) COLLATE utf8_bin NOT NULL DEFAULT 'NOTSET',
+  `belongsToGroup` varchar(28) COLLATE utf8_bin DEFAULT 'NOTSET',
+  `gameType` varchar(16) COLLATE utf8_bin NOT NULL DEFAULT 'NOTSET',
+  `gameName` varchar(16) COLLATE utf8_bin DEFAULT 'NOTSET',
+  `startedAtInUTC` datetime NOT NULL,
+  `finishedAtInUTC` datetime NOT NULL,
+  `timezoneApplicable` varchar(16) COLLATE utf8_bin DEFAULT 'NOTSET',
+  `endReason` varchar(32) COLLATE utf8_bin DEFAULT NULL,
+  `score` int(11) DEFAULT '-1',
+  `timeTaken` int(11) NOT NULL DEFAULT '-1',
+  `outcomeInMPGameSession` varchar(16) COLLATE utf8_bin NOT NULL DEFAULT 'NOTAPPLICABLE',
+  PRIMARY KEY (`companyID`,`belongsToDepartment`,`playerID`,`gameID`,`gameSessionUUID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;

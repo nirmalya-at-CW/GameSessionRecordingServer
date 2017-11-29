@@ -44,7 +44,7 @@ object GameSessionRecordingServer {
   val gameSessionCompletionEmitter =
     underlyingActorSystem
     .actorOf(
-      GameSessionCompletionEmitterActor(gameSessionCompletionSubscriberEndpoints),"EmitterOnFinishingGameSession")
+      GameSessionCompletionNotifierActor.apply,"EmitterOnFinishingGameSession")
 
   val sessionHandlingSPOC =
     underlyingActorSystem
@@ -156,7 +156,7 @@ object GameSessionRecordingServer {
             complete {
               println(s"req: $reqStartAGameWith")
               println("SPOC: " + sessionHandlingSPOC.path)
-              (sessionHandlingSPOC ? reqStartAGameWith).mapTo[RESPGameSessionBody]
+              (sessionHandlingSPOC ? reqStartAGameWith).mapTo[HuddleRESPGameSessionBody]
 
             }
           }
@@ -177,7 +177,7 @@ object GameSessionRecordingServer {
           complete {
             println(s"req: $reqSetQuizForGameWith")
             println("SPOC: " + sessionHandlingSPOC.path)
-            (sessionHandlingSPOC ? reqSetQuizForGameWith).mapTo[RESPGameSessionBody]
+            (sessionHandlingSPOC ? reqSetQuizForGameWith).mapTo[HuddleRESPGameSessionBody]
 
           }
         }
@@ -198,7 +198,7 @@ object GameSessionRecordingServer {
             complete {
               println(s"req: $reqPlayAGameWith")
               println("SPOC: " + sessionHandlingSPOC.path)
-              (sessionHandlingSPOC ? reqPlayAGameWith).mapTo[RESPGameSessionBody]
+              (sessionHandlingSPOC ? reqPlayAGameWith).mapTo[HuddleRESPGameSessionBody]
             }
           }
         }
@@ -218,7 +218,7 @@ object GameSessionRecordingServer {
             complete {
               println(s"req: $reqPlayAClipWith")
               println("SPOC: " + sessionHandlingSPOC.path)
-              (sessionHandlingSPOC ? reqPlayAClipWith).mapTo[RESPGameSessionBody]
+              (sessionHandlingSPOC ? reqPlayAClipWith).mapTo[HuddleRESPGameSessionBody]
             }
           }
         }
@@ -237,7 +237,7 @@ object GameSessionRecordingServer {
           entity(as[REQPauseAGameWith]) { reqPauseAGameWith =>
             complete {
               println(s"req: $reqPauseAGameWith")
-              (sessionHandlingSPOC ? reqPauseAGameWith).mapTo[RESPGameSessionBody]
+              (sessionHandlingSPOC ? reqPauseAGameWith).mapTo[HuddleRESPGameSessionBody]
             }
           }
         }
@@ -256,7 +256,7 @@ object GameSessionRecordingServer {
         entity(as[REQEndAGameByManagerWith]) { reqEndedByManagerWith =>
           complete {
             println(s"req: $reqEndedByManagerWith")
-            (sessionHandlingSPOC ? reqEndedByManagerWith).mapTo[RESPGameSessionBody]
+            (sessionHandlingSPOC ? reqEndedByManagerWith).mapTo[HuddleRESPGameSessionBody]
           }
         }
       }
@@ -275,7 +275,7 @@ object GameSessionRecordingServer {
           entity(as[REQEndAGameWith]) { reqEndAGameWith =>
             complete {
               println(s"req: $reqEndAGameWith")
-              (sessionHandlingSPOC ? reqEndAGameWith).mapTo[RESPGameSessionBody]
+              (sessionHandlingSPOC ? reqEndAGameWith).mapTo[HuddleRESPGameSessionBody]
             }
           }
         }
