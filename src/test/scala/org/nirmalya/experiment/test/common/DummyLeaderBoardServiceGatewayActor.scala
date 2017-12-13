@@ -2,27 +2,27 @@ package org.nirmalya.experiment.test.common
 
 import akka.actor.{Actor, ActorLogging, Props}
 import akka.event.LoggingReceive
-import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{DespatchedToLeaderboardAcknowledgement, LeaderboardConsumableData}
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{DespatchedToLiveboardAcknowledgement, LiveboardConsumableData}
 
 import scala.sys.Prop
 
 /**
   * Created by nirmalya on 1/11/17.
   */
-class DummyLeaderBoardServiceGatewayActor(leaderBoardServiceEndpoint: String) extends Actor with ActorLogging {
+class DummyLiveBoardServiceGatewayActor(liveBoardServiceEndpoint: String) extends Actor with ActorLogging {
 
 
-  override def receive = LoggingReceive.withLabel("Leaderboard"){
+  override def receive = LoggingReceive.withLabel("Liveboard"){
 
-    case lb: LeaderboardConsumableData =>
+    case lb: LiveboardConsumableData =>
 
-      log.info(s"leaderboard information: ${lb}")
-      sender ! DespatchedToLeaderboardAcknowledgement
+      log.info(s"liveboard information: ${lb}")
+      sender ! DespatchedToLiveboardAcknowledgement
 
   }
 }
 
-object DummyLeaderBoardServiceGatewayActor {
+object DummyLiveBoardServiceGatewayActor {
 
-  def apply(leaderBoardServiceEndpoint: String) = Props(new DummyLeaderBoardServiceGatewayActor(leaderBoardServiceEndpoint))
+  def apply(liveBoardServiceEndpoint: String) = Props(new DummyLiveBoardServiceGatewayActor(liveBoardServiceEndpoint))
 }

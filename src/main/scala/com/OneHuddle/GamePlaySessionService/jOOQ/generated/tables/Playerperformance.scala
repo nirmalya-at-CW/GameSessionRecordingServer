@@ -90,6 +90,11 @@ class Playerperformance(alias : Name, aliased : Table[PlayerperformanceRecord], 
   val GAMETYPE : TableField[PlayerperformanceRecord, String] = createField("gameType", org.jooq.impl.SQLDataType.VARCHAR(8).nullable(false).defaultValue(org.jooq.impl.DSL.field("NOTSET", org.jooq.impl.SQLDataType.VARCHAR)), "")
 
   /**
+   * The column <code>OneHuddle.PlayerPerformance.groupID</code>.
+   */
+  val GROUPID : TableField[PlayerperformanceRecord, String] = createField("groupID", org.jooq.impl.SQLDataType.VARCHAR(32).nullable(false).defaultValue(org.jooq.impl.DSL.field("NOTSET", org.jooq.impl.SQLDataType.VARCHAR)), "")
+
+  /**
    * The column <code>OneHuddle.PlayerPerformance.lastPlayedOn</code>.
    */
   val LASTPLAYEDON : TableField[PlayerperformanceRecord, Timestamp] = createField("lastPlayedOn", org.jooq.impl.SQLDataType.TIMESTAMP.nullable(false), "")
@@ -112,7 +117,7 @@ class Playerperformance(alias : Name, aliased : Table[PlayerperformanceRecord], 
   /**
    * The column <code>OneHuddle.PlayerPerformance.winsAchieved</code>.
    */
-  val WINSACHIEVED : TableField[PlayerperformanceRecord, Integer] = createField("winsAchieved", org.jooq.impl.SQLDataType.INTEGER.nullable(false).defaultValue(org.jooq.impl.DSL.field("0", org.jooq.impl.SQLDataType.INTEGER)), "")
+  val WINSACHIEVED : TableField[PlayerperformanceRecord, Integer] = createField("winsAchieved", org.jooq.impl.SQLDataType.INTEGER.nullable(false), "")
 
   /**
    * Create a <code>OneHuddle.PlayerPerformance</code> table reference

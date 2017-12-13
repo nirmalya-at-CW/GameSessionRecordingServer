@@ -44,7 +44,7 @@ object GameSessionRecordingServer {
   val gameSessionCompletionEmitter =
     underlyingActorSystem
     .actorOf(
-      GameSessionCompletionNotifierActor.apply,"EmitterOnFinishingGameSession")
+      LiveBoardNotifierActor.apply,"EmitterOnFinishingGameSession")
 
   val sessionHandlingSPOC =
     underlyingActorSystem

@@ -8,7 +8,7 @@ import com.typesafe.config.ConfigFactory
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.ExternalAPIParams._
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{GameSession, QuestionAnswerTuple}
 import com.OneHuddle.GamePlaySessionService.GameSessionSPOCActor
-import org.nirmalya.experiment.test.common.{DummyLeaderBoardServiceGatewayActor, StopSystemAfterAll}
+import org.nirmalya.experiment.test.common.{DummyLiveBoardServiceGatewayActor, StopSystemAfterAll}
 import org.scalatest.{BeforeAndAfterAll, MustMatchers, WordSpecLike}
 
 import scala.concurrent.TimeoutException
@@ -49,13 +49,13 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
 
   // val emitterActor = system.actorOf(GameSessionCompletionEmitterActor(List("http://httpbin.org/put")))
 
-  val dummyLeaderboardServiceEndpoint =
+  val dummyLiveboardServiceEndpoint =
     config.getConfig("GameSession.externalServices").getStringList("completionSubscribers").get(0)
 
 
-  val leaderboardInfomer = system.actorOf(DummyLeaderBoardServiceGatewayActor(dummyLeaderboardServiceEndpoint))
+  val liveboardInfomer = system.actorOf(DummyLiveBoardServiceGatewayActor(dummyLiveboardServiceEndpoint))
 
-  val emitterActor = leaderboardInfomer
+  val emitterActor = liveboardInfomer
 
   override def beforeAll = super.beforeAll
 

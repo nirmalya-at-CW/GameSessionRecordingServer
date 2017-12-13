@@ -6,9 +6,11 @@ import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
 import akka.event.LoggingReceive
 import akka.pattern._
 import akka.util.Timeout
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.EmittedEvents.{DataSharedWithAdminPanel, EvGameSessionLaunched}
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.ExternalAPIParams._
-import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{ExternalAPIParams, GameSession, GameSessionEndedByManager, GameSessionEndedByPlayer, HuddleGame, QuestionAnswerTuple, RedisRecordingStatus}
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{ExternalAPIParams, GameSession, HuddleGame, QuestionAnswerTuple}
 import com.OneHuddle.GamePlaySessionService.MariaDBAware.GameSessionDBButlerActor
+import com.OneHuddle.xAPI.ScormInformationExchangeActor
 
 import scala.concurrent.Future
 import scala.concurrent.duration.{Duration, FiniteDuration}
@@ -37,7 +39,15 @@ class GameSessionSPOCActor(gameSessionFinishedEventEmitter: ActorRef) extends Ac
         TimeUnit.SECONDS
     )
 
+  val endpoint = context.system.settings.config.getConfig("LRS").getString("endpoint")
+  val user     = context.system.settings.config.getConfig("LRS").getString("username")
+  val password = context.system.settings.config.getConfig("LRS").getString("password")
+
+  val lrsExchangeActor = context.actorOf(ScormInformationExchangeActor(endpoint,"",user,password),"LRSExchange")
+
   val dbAccessURL = context.system.settings.config.getConfig("GameSession.externalServices").getString("dbAccessURL")
+
+  val adminPanelNotifierActor = context.actorOf(AdminPanelNotifierActor(), "AdminPanelNotifier-by-SPOC")
 
   // TODO: arrange for a specific dispatcher for the actors, accessing databases.
   val gameSessionRecordDBButler = context.actorOf(GameSessionDBButlerActor(dbAccessURL, context.system.dispatcher))
@@ -77,14 +87,24 @@ class GameSessionSPOCActor(gameSessionFinishedEventEmitter: ActorRef) extends Ac
                   redisPort,
                   maxGameSessionLifetime,
                   gameSessionFinishedEventEmitter,
+                  adminPanelNotifierActor,
+                  lrsExchangeActor,
                   dbAccessURL
               ),
               gameSessionInfo.toString
-           )
+        )
         context.watch(child) // Because we want to restart failing actors
                              // TODO: implement logic to restart!
 
         this.activeGameSessionCustodians = this.activeGameSessionCustodians + Tuple2(r.gameSessionUUID,child)
+
+        adminPanelNotifierActor ! EvGameSessionLaunched(
+                                        DataSharedWithAdminPanel(
+                                          gameSessionInfo.companyID,
+                                          gameSessionInfo.departmentID,
+                                          gameSessionInfo.playerID,
+                                          gameSessionInfo.gameSessionUUID)
+                                  )
 
         // TODO: We need to send an appropriate RESP object here; just a pipeTo may be inadequate.
         (child ? HuddleGame.EvInitiated(System.currentTimeMillis())).pipeTo(sender)
@@ -215,6 +235,7 @@ class GameSessionSPOCActor(gameSessionFinishedEventEmitter: ActorRef) extends Ac
 
        activeGameSessionCustodians = activeGameSessionCustodians - custodianKey
       log.info(s"Custodian Actor ($custodianActor) terminated." )
+      log.debug(s"Still active sessions: ${activeGameSessionCustodians.mkString(" | ")}")
       // context stop(self)
 
     case (m: Any) =>

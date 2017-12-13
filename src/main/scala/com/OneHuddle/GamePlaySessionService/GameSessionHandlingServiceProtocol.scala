@@ -144,18 +144,38 @@ object GameSessionHandlingServiceProtocol {
     override val gameType = "MINIMP"
   }
 
-  case class LeaderboardConsumableData(
+  case class LiveboardConsumableData(
                companyID: String, departmentID: String, gameID: String, playerID: String,
                groupID: String, gameSessionUUID: String, score: Int
              )
 
-  case class PlayerPerformanceRecordSP(
-                companyID: String, belongsToDepartment: String, playerID: String, gameID: String,
-                lastPlayedOn: ZonedDateTime, timezoneApplicable: String, pointsObtained: Int, timeTaken: Int)
+  trait PlayerPerformancePerLastSession {
+    val companyID: String
+    val belongsToDepartment: String
+    val playerID: String
+    val gameID: String
+    val gameType: String
+    val groupID: String
+    val pointsObtained: Int
+    val timeTaken: Int
+    val winsAchieved: Int
+  }
 
+  case class PlayerPerformanceRecordSP(
+                companyID: String, belongsToDepartment: String, playerID: String, gameID: String, groupID: String = "NOTSET",
+                lastPlayedOn: ZonedDateTime, timezoneApplicable: String, pointsObtained: Int, timeTaken: Int)
+             extends PlayerPerformancePerLastSession {
+            override val winsAchieved = 0
+            override val gameType = "REGSP"
+
+  }
   case class PlayerPerformanceRecordMP(
-                companyID: String, belongsToDepartment: String, playerID: String, gameID: String,
+                companyID: String, belongsToDepartment: String, playerID: String, gameID: String, groupID: String = "NOTSET",
                 lastPlayedOn: ZonedDateTime, timezoneApplicable: String, pointsObtained: Int, timeTaken: Int, winsAchieved: Int)
+             extends PlayerPerformancePerLastSession {
+
+             override val gameType = "REGMP"
+  }
 
 
 
@@ -188,7 +208,7 @@ object GameSessionHandlingServiceProtocol {
         classOf[REQStartAGameWith],
         classOf[RedisRecordingStatus],
         classOf[HuddleRESPGameSessionBody],
-        classOf[LeaderboardConsumableData]
+        classOf[LiveboardConsumableData]
       )
     )
   )
@@ -242,15 +262,26 @@ object GameSessionHandlingServiceProtocol {
 
   }
 
+  object EmittedEvents {
 
-  case class RedisRecordingStatus(details: String)
+    sealed trait EventSubscribedByAdminPanel
+      case class DataSharedWithAdminPanel(
+                       companyID: String, belongsToDepartment: String,
+                       playerID: String, gameSessionUUID: String
+                     )
+
+    case class   EvGameSessionLaunched (data: DataSharedWithAdminPanel) extends EventSubscribedByAdminPanel
+    case class   EvGameSessionFinishedByPlayer(data: DataSharedWithAdminPanel) extends EventSubscribedByAdminPanel
+    case class   EvGameSessionTerminatedByTimeOut(data: DataSharedWithAdminPanel) extends EventSubscribedByAdminPanel
+    case class   EvGameSessionTerminatedByManager(data: DataSharedWithAdminPanel, manager: String) extends EventSubscribedByAdminPanel
+  }
+
+  case class  RedisRecordingStatus(details: String)
 
   case class  EmittedWhenGameSessionIsFinished(contents: String)
-  case class  DespatchedToLeaderboardAcknowledgement (
+  case class  DespatchedToLiveboardAcknowledgement (
                  val statusHTTP: Int, val statusTextHTTP: String, val errorReason: Option[String] = None
-
-                                                     )
-
+             )
 
   trait RedisSessionStatus
   case class  FailedRedisSessionStatus(reason: String) extends RedisSessionStatus
@@ -266,8 +297,7 @@ object GameSessionHandlingServiceProtocol {
 
 
     case class DBActionPlayerPerformanceRecord(
-          companyID: String, belongsToDepartment: String, playerID: String, gameID: String,
-          gameType: String = "SP",
+          companyID: String, belongsToDepartment: String, playerID: String, gameID: String, gameType: String, groupID: String,
           lastPlayedOn: LocalDateTime, timezoneApplicable: String,
           pointsObtained: Int, timeTaken: Int, winsAchieved: Int)
     

@@ -34,8 +34,6 @@ class RedisButlerGameSessionRecording(redisHost: String, redisPort: Int) {
 
     val historySoFar = this.redisClient.hget(gameSession, key)
 
-    // println(historySoFar)
-
     historySoFar match {
       case Some(record) => parse(record).extract[CompleteGamePlaySessionHistory]
       case None         => NonExistingCompleteGamePlaySessionHistory

@@ -8,8 +8,10 @@ import akka.pattern._
 import akka.util.Timeout
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.ExternalAPIParams.{ExpandedMessage, HuddleRESPGameSessionBodyWhenFailed, HuddleRESPGameSessionBodyWhenSuccessful}
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.DBHatch.{DBActionGameSessionRecord, DBActionInsert, DBActionInsertSuccess, DBActionOutcome}
-import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{DBHatch, DespatchedToLeaderboardAcknowledgement, GameSession, GameSessionEndedByPlayer, HuddleGame, LeaderboardConsumableData}
-import com.OneHuddle.GamePlaySessionService.MariaDBAware.GameSessionDBButlerActor
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.EmittedEvents._
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{ComputedGameSessionRegSP, DBHatch, DespatchedToLiveboardAcknowledgement, GameSession, GameSessionEndedByPlayer, HuddleGame, LiveboardConsumableData, PlayerPerformanceRecordSP}
+import com.OneHuddle.GamePlaySessionService.MariaDBAware.{GameSessionDBButlerActor, PlayerPerformanceDBButlerActor}
+import com.OneHuddle.xAPI.UpdateLRSGamePlayed
 
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.util.{Failure, Success}
@@ -24,7 +26,9 @@ class GameSessionCustodianActor (
                                   val redisHost: String,
                                   val redisPort: Int,
                                   val maxGameSessionLifetime: FiniteDuration,
-                                  val leaderBoardInformerActor: ActorRef,
+                                  val liveBoardInformerActor: ActorRef,
+                                  val adminPanelNotifierActor: ActorRef,
+                                  val lrsExchangeActor: ActorRef,
                                   val dbAccessURL: String
 
       ) extends Actor with ActorLogging {
@@ -36,8 +40,7 @@ class GameSessionCustodianActor (
       toInt,
       "seconds")
 
-  // TODO: Make this a construction parameter
-  val applicableZoneDesc =  "Asia/Calcutta"
+  val playedInTimeZone = gameSessionInfo.playedInTimezone
 
   case object CloseGameSession
 
@@ -53,8 +56,11 @@ class GameSessionCustodianActor (
 
   //TODO: instead of making this a direct child, we should create a router and encapsulate that with HTTP apis.
   //TODO: we should pass a different dispatcher (properly configured) to the actor below; currently it is the same dispatcher
-  val gameSessionRecordDBButler = context.system.actorOf(GameSessionDBButlerActor(dbAccessURL, context.dispatcher))
+  val gameSessionRecordDBButlerActor = context.system.actorOf(GameSessionDBButlerActor(dbAccessURL, context.dispatcher))
   context.watch(gameSessionStateHolderActor)
+
+  val playerPerformanceDBButlerActor = context.system.actorOf(PlayerPerformanceDBButlerActor(dbAccessURL, context.dispatcher))
+  context.watch(playerPerformanceDBButlerActor)
 
   def gamePlayIsOnState: Receive = LoggingReceive.withLabel("gamePlayIsOnState") {
 
@@ -104,7 +110,17 @@ class GameSessionCustodianActor (
       val confirmation = (gameSessionStateHolderActor ? ev).mapTo[String]
 
       confirmation.onComplete {
-        case Success(d) => originalSender ! HuddleRESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200, d))
+        case Success(d) =>
+          adminPanelNotifierActor ! EvGameSessionFinishedByPlayer(
+                                      DataSharedWithAdminPanel(
+                                        gameSessionInfo.companyID,
+                                        gameSessionInfo.departmentID,
+                                        gameSessionInfo.playerID,
+                                        gameSessionInfo.gameSessionUUID)
+                                    )
+
+          originalSender ! HuddleRESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200, d))
+
         case Failure(e) => originalSender ! HuddleRESPGameSessionBodyWhenFailed(ExpandedMessage(1200, e.getMessage))
       }
 
@@ -117,16 +133,35 @@ class GameSessionCustodianActor (
       val confirmation = (gameSessionStateHolderActor ? ev).mapTo[String]
 
       confirmation.onComplete {
-        case Success(d) => originalSender ! HuddleRESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200, d))
+
+        case Success(d) =>
+          adminPanelNotifierActor ! EvGameSessionTerminatedByManager(
+            DataSharedWithAdminPanel(
+              gameSessionInfo.companyID,
+              gameSessionInfo.departmentID,
+              gameSessionInfo.playerID,
+              gameSessionInfo.gameSessionUUID),ev.managerName
+          )
+          println(s"|**********| message sent to adminPanelNotifierActor(${adminPanelNotifierActor.path})")
+          originalSender ! HuddleRESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200, d))
+
         case Failure(e) => originalSender ! HuddleRESPGameSessionBodyWhenFailed(ExpandedMessage(1200, e.getMessage))
       }
 
-      log.info(s"GameSession ${gameSessionInfo.gameSessionUUID}, ends. Cause: Manager forced termination.")
+      log.info(s"GameSession ${gameSessionInfo.gameSessionUUID}, ends. Cause: Manager ${ev.managerName} forced termination.")
       context.become(gamePlayIsBarredState)
 
 
     case ev: HuddleGame.EvEndedByTimeout =>
 
+      adminPanelNotifierActor ! EvGameSessionTerminatedByTimeOut(
+        DataSharedWithAdminPanel(
+          gameSessionInfo.companyID,
+          gameSessionInfo.departmentID,
+          gameSessionInfo.playerID,
+          gameSessionInfo.gameSessionUUID)
+      )
+      println(s"|**********| message sent to adminPanelNotifierActor(${adminPanelNotifierActor.path})")
       log.info(s"GameSession ${gameSessionInfo.gameSessionUUID}, ends at ${ev.endedAt}. Cause: Timed out.")
       context.become(gamePlayIsBarredState)
 
@@ -136,16 +171,32 @@ class GameSessionCustodianActor (
 
     case ev: HuddleGame.EvGameFinishedAndScored =>
 
-      gameSessionRecordDBButler ! ev.computedGameSession
+      val playerPerformanceRecordSP = PlayerPerformanceRecordSP(
+        ev.computedGameSession.companyID,
+        ev.computedGameSession.departmentID,
+        ev.computedGameSession.playerID,
+        ev.computedGameSession.gameID,
+        ev.computedGameSession.groupID,
+        ev.computedGameSession.finishedAt,
+        ev.computedGameSession.timezoneApplicable,
+        ev.computedGameSession.totalPointsObtained,
+        ev.computedGameSession.timeTakenToFinish
+      )
 
-      var expectedConfirmations: Set[String] = Set(DBHatch.DBActionInsertSuccess.toString)
+      lrsExchangeActor ! UpdateLRSGamePlayed(playerPerformanceRecordSP)
 
+      gameSessionRecordDBButlerActor ! ev.computedGameSession
+
+      var expectedConfirmationsFromActors = Set(gameSessionRecordDBButlerActor)
+
+      playerPerformanceDBButlerActor ! playerPerformanceRecordSP
+      expectedConfirmationsFromActors = expectedConfirmationsFromActors + playerPerformanceDBButlerActor
 
       // Only sessions which have been ended by a Player, are considered for further computation and
-      // for being offered to Leaderboard
+      // for being offered to Liveboard
       if (ev.computedGameSession.endedBecauseOf == GameSessionEndedByPlayer.toString) {
 
-        val infoForLeaderBoard = LeaderboardConsumableData(
+        val infoForLiveBoard = LiveboardConsumableData(
           gameSessionInfo.companyID,
           gameSessionInfo.departmentID,
           gameSessionInfo.gameID,
@@ -155,34 +206,37 @@ class GameSessionCustodianActor (
           ev.computedGameSession.totalPointsObtained
         )
 
-        leaderBoardInformerActor ! infoForLeaderBoard
-        expectedConfirmations = expectedConfirmations +  DespatchedToLeaderboardAcknowledgement.toString
+        liveBoardInformerActor ! infoForLiveBoard
+        expectedConfirmationsFromActors = expectedConfirmationsFromActors +  liveBoardInformerActor
 
       }
 
-      context.become(expectingConfirmationsFromDBLBServicesState(expectedConfirmations))
+      context.become(expectingConfirmationsFromDownstreamServicesState(expectedConfirmationsFromActors))
 
   }
 
-  def expectingConfirmationsFromDBLBServicesState(allTheseConfirmations: Set[String]): Receive =
+  private def expectingConfirmationsFromDownstreamServicesState(allTheseConfirmations: Set[ActorRef]): Receive =
     LoggingReceive.withLabel("expectingConfirmationsFromDBLBServicesState") {
 
-    case o: DBHatch.DBActionInsertSuccess =>
-      log.info(s"${o.i} GameSession records inserted in DB")
+    case dbActionStatus: DBHatch.DBActionInsertSuccess =>
 
-      val updatedConfirmations = allTheseConfirmations.filter(e => e != DBHatch.DBActionInsertSuccess.toString())
+      val originalSender = sender()
+
+      log.info(s"GameSession records insertion status: Success, from ${originalSender.path.name}")
+
+      val updatedConfirmations = allTheseConfirmations.filter(e => e != originalSender)
 
       if (updatedConfirmations.isEmpty) {
         self ! CloseGameSession
         context.become(gettingReadyToCloseSessionState)
       }
       else
-        context.become(expectingConfirmationsFromDBLBServicesState(updatedConfirmations))
+        context.become(expectingConfirmationsFromDownstreamServicesState(updatedConfirmations))
 
-    case DespatchedToLeaderboardAcknowledgement =>
-      log.info(s"GameSession ${gameSessionInfo.gameSessionUUID}, update sent to Leaderboard Service")
+    case DespatchedToLiveboardAcknowledgement =>
+      log.info(s"GameSession ${gameSessionInfo.gameSessionUUID}, update sent to Liveboard Service")
 
-      val updatedConfirmations = allTheseConfirmations.filter(e => e != DespatchedToLeaderboardAcknowledgement.toString)
+      val updatedConfirmations = allTheseConfirmations.filter(e => e != DespatchedToLiveboardAcknowledgement.toString)
 
       if (updatedConfirmations.isEmpty) {
         self ! CloseGameSession
@@ -190,11 +244,11 @@ class GameSessionCustodianActor (
 
       }
       else
-        context.become(expectingConfirmationsFromDBLBServicesState(updatedConfirmations))
+        context.become(expectingConfirmationsFromDownstreamServicesState(updatedConfirmations))
 
     case m: Any  =>
-      log.debug(s"Unknown message, $m, while expecting confirmation from DB and Leaderboard intimation Service.")
-      context.become(expectingConfirmationsFromDBLBServicesState(allTheseConfirmations))
+      log.debug(s"Unknown message, $m, while expecting confirmation from DB and Liveboard intimation Service.")
+      context.become(expectingConfirmationsFromDownstreamServicesState(allTheseConfirmations))
 
   }
 
@@ -240,14 +294,18 @@ object GameSessionCustodianActor {
             redisHost: String,
             redisPort: Int,
             maxGameSessionLifetime: FiniteDuration,
-            sessionCompletionEvReceiverActor: ActorRef,
+            liveBoardInformerActor: ActorRef,
+            adminPanelNotifierActor: ActorRef,
+            lrsExchangeActor: ActorRef,
             dbAccessURL: String): Props =
     Props(new GameSessionCustodianActor(
       gameSessionInfo,
       redisHost,
       redisPort,
       maxGameSessionLifetime,
-      sessionCompletionEvReceiverActor,
+      liveBoardInformerActor,
+      adminPanelNotifierActor,
+      lrsExchangeActor,
       dbAccessURL
     ))
 }

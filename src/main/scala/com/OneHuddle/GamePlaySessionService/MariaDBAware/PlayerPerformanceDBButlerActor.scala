@@ -1,11 +1,11 @@
 package com.OneHuddle.GamePlaySessionService.MariaDBAware
 
 import java.sql.{Connection, DriverManager, Timestamp}
-import java.time.{LocalDateTime, ZoneId}
+import java.time.{LocalDateTime, ZoneId, ZoneOffset}
 
 import akka.actor.Actor.Receive
 import akka.actor.{Actor, ActorLogging, Props}
-import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.DBHatch.{DBActionGameSessionRecord, DBActionPlayerPerformanceRecord}
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.DBHatch.{DBActionGameSessionRecord, DBActionInsertFailure, DBActionInsertSuccess, DBActionPlayerPerformanceRecord}
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.PlayerPerformanceRecordSP
 import org.jooq.SQLDialect
 import org.jooq.impl.DSL
@@ -32,17 +32,22 @@ class PlayerPerformanceDBButlerActor(
 
     case r: PlayerPerformanceRecordSP =>
 
+      log.info(s"Database action=Insert, PlayerPerformance, Player = ${r.companyID}.${r.belongsToDepartment}.${r.playerID} starts.")
+
+      val sessionPlayedOnUTC = r.lastPlayedOn.withZoneSameInstant(ZoneOffset.UTC)
+
       val dbRecord = DBActionPlayerPerformanceRecord(
         r.companyID,
         r.belongsToDepartment,
         r.playerID,
         r.gameID,
-        gameType="SP",
+        r.gameType,
+        r.groupID,
         r.lastPlayedOn.toLocalDateTime,
         r.timezoneApplicable,
         r.pointsObtained,
         r.timeTaken,
-        winsAchieved = 0
+        r.winsAchieved
       )
       val rows = PlayerPerformanceDBButlerActor
                  .upsert(
@@ -50,7 +55,7 @@ class PlayerPerformanceDBButlerActor(
                    dbRecord
                  )
 
-      sender ! rows
+      sender ! (if (rows == 1) DBActionInsertSuccess(1) else DBActionInsertFailure(s"$rows inserted"))
 
     case u: DBActionPlayerToUpdate   =>
 
@@ -62,7 +67,7 @@ object PlayerPerformanceDBButlerActor {
 
   def apply(dbAccessURL: String, dbAccessDispatcher: ExecutionContextExecutor): Props =
 
-             Props(new GameSessionDBButlerActor(dbAccessURL, dbAccessDispatcher))
+             Props(new PlayerPerformanceDBButlerActor(dbAccessURL, dbAccessDispatcher))
 
   def retrieve(
         c: Connection, companyID: String, department: String, gameID: String, playerID: String)
@@ -101,6 +106,7 @@ object PlayerPerformanceDBButlerActor {
     playerPerformanceRecord.setBelongstodepartment     (playerPerformanceData.belongsToDepartment)
     playerPerformanceRecord.setPlayerid                (playerPerformanceData.playerID)
     playerPerformanceRecord.setGameid                  (playerPerformanceData.gameID)
+    playerPerformanceRecord.setGroupid                 (playerPerformanceData.groupID)
     playerPerformanceRecord.setLastplayedon            (Timestamp.valueOf(playerPerformanceData.lastPlayedOn))
     playerPerformanceRecord.setTimezoneapplicable      (playerPerformanceData.timezoneApplicable)
     playerPerformanceRecord.setPointsobtained          (playerPerformanceData.pointsObtained)
@@ -110,8 +116,6 @@ object PlayerPerformanceDBButlerActor {
 
     e.insertInto(PLAYERPERFORMANCE)
        .set(playerPerformanceRecord)
-       .onDuplicateKeyUpdate()
-       .set(playerPerformanceRecord)
        .execute()
 
   }
@@ -120,5 +124,5 @@ object PlayerPerformanceDBButlerActor {
 
 object NonExistentPlayerPerformance extends
   DBActionPlayerPerformanceRecord(
-    "Unknown","Unknown","Unknown","Unknown","Unknown",LocalDateTime.now(ZoneId.of("Z")),"Unknown",-1,-1,-1)
+    "Unknown","Unknown","Unknown","Unknown","Unknown","Unknown",LocalDateTime.now(ZoneId.of("Z")),"Unknown",-1,-1,-1)
 

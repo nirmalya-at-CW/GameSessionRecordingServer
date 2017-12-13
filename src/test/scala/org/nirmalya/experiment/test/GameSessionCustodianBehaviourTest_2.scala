@@ -103,6 +103,10 @@ class GameSessionCustodianBehaviourTest_2  extends TestKit(ActorSystem(
   val dummyLeaderboardServiceEndpoint =
     testSpecificConfig.getConfig("GameSession.externalServices").getStringList("completionSubscribers").get(0)
 
+  val adminPanelNotifierActor = system.actorOf(DummyAdminPanelNotifierActor.apply(),"~~DummyAdminPanelNotifier~~")
+
+  val lrsProbe = TestProbe()
+
   val questionaAndAnswers = IndexedSeq(
     QuestionAnswerTuple(1,1,true,10,5),
     QuestionAnswerTuple(2,2,true,10,5),
@@ -124,7 +128,7 @@ class GameSessionCustodianBehaviourTest_2  extends TestKit(ActorSystem(
       val evQuestionAnswered_2 =   HuddleGame.EvQuestionAnswered(gameStartsAt+4,questionaAndAnswers(1))
 
 
-      val leaderboardInfomer = system.actorOf(DummyLeaderBoardServiceGatewayActor(dummyLeaderboardServiceEndpoint))
+      val liveboardInfomer = system.actorOf(DummyLiveBoardServiceGatewayActor(dummyLeaderboardServiceEndpoint))
 
       val custodianActorName = s"GameSessionCustodianActor-${gameSessionInfo.gameSessionUUID}"
 
@@ -134,7 +138,9 @@ class GameSessionCustodianBehaviourTest_2  extends TestKit(ActorSystem(
           redisHost,
           redisPort,
           maxGameSessionLifetime,
-          leaderboardInfomer,
+          liveboardInfomer,
+          adminPanelNotifierActor,
+          lrsProbe.ref,
           dbAccessURL
         ),custodianActorName)
 

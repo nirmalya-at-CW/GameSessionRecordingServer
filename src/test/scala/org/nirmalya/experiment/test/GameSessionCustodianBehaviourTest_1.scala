@@ -10,7 +10,7 @@ import com.typesafe.config.ConfigFactory
 import com.OneHuddle.GamePlaySessionService.GameSessionCustodianActor
 
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.ExternalAPIParams.{ExpandedMessage, HuddleRESPGameSessionBodyWhenSuccessful}
-import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{ComputedGameSessionRegSP, EmittedWhenGameSessionIsFinished, GameSession, GameSessionEndedByPlayer, GameSessionEndedByTimeOut, HuddleGame, LeaderboardConsumableData, QuestionAnswerTuple}
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{ComputedGameSessionRegSP, EmittedWhenGameSessionIsFinished, GameSession, GameSessionEndedByPlayer, GameSessionEndedByTimeOut, HuddleGame, LiveboardConsumableData, QuestionAnswerTuple}
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.HuddleGame.EvInitiated
 import com.OneHuddle.GamePlaySessionService.MariaDBAware.{GameSessionDBButlerActor, NonExistentComputedGameSession, NonExistentGameSessionRecord}
 
@@ -52,7 +52,7 @@ class GameSessionCustodianBehaviourTest_1  extends TestKit(ActorSystem("ActorSys
     TimeUnit.SECONDS
   )
 
-  val dummyLeaderboardServiceEndpoint =
+  val dummyLiveboardServiceEndpoint =
     config.getConfig("GameSession.externalServices").getStringList("completionSubscribers").get(0)
 
   val questionaAndAnswers = IndexedSeq(
@@ -62,13 +62,21 @@ class GameSessionCustodianBehaviourTest_1  extends TestKit(ActorSystem("ActorSys
     QuestionAnswerTuple(4,4,true,10,5)
   )
 
+  val adminPanelNotifierActor = system.actorOf(DummyAdminPanelNotifierActor.apply(),"DummyAdminPanelNotifier")
+
+  val lrsProbe = TestProbe()
+
+
 
   "A Huddle GameSession Custodian" must {
 
     "respond with success on initiation of a GameSession" in {
 
        val gameSessionInfo = GameSession("CW","QA","G01","P01","Tic-Tac-Toe","UUID-1",playedInTimezone = "Asia/Calcutta")
-       val leaderboardInfomer = system.actorOf(DummyLeaderBoardServiceGatewayActor(dummyLeaderboardServiceEndpoint))
+       val liveboardInfomer = system.actorOf(DummyLiveBoardServiceGatewayActor(dummyLiveboardServiceEndpoint))
+
+
+      val custodianActorName = s"GameSessionCustodianActor-${gameSessionInfo.gameSessionUUID}"
 
        val  custodian = system.actorOf(
          GameSessionCustodianActor(
@@ -76,9 +84,11 @@ class GameSessionCustodianBehaviourTest_1  extends TestKit(ActorSystem("ActorSys
            redisHost,
            redisPort,
            maxGameSessionLifetime,
-           leaderboardInfomer,
+           liveboardInfomer,
+           adminPanelNotifierActor,
+           lrsProbe.ref,
            ""
-         ))
+         ),custodianActorName)
        val evinitiated = EvInitiated(System.currentTimeMillis())
 
       custodian ! evinitiated
@@ -88,7 +98,7 @@ class GameSessionCustodianBehaviourTest_1  extends TestKit(ActorSystem("ActorSys
     }
   }
 
-  "should ensure that a Leaderboard Informer actor receives the correct message when the player ends a session" in {
+  "should ensure that a Liveboard Informer actor receives the correct message when the player ends a session" in {
 
     val timezoneApplicableForTestcase = "Asia/Calcutta"
     val gameSessionInfo = GameSession("CW", "QA", "G02", "P02", "Tic-Tac-Toe", "UUID-4", gameType = "SP", playedInTimezone = timezoneApplicableForTestcase)
@@ -106,9 +116,9 @@ class GameSessionCustodianBehaviourTest_1  extends TestKit(ActorSystem("ActorSys
     val evQuestionAnswered_2 = HuddleGame.EvQuestionAnswered(gameStartsAt + 4, questionaAndAnswers(1))
     val evSessionEndedByPlayer = HuddleGame.EvEndedByPlayer(gameStartsAt + 6, 10)
 
-    val leaderboardInformerProbe = TestProbe()
+    val liveboardInformerProbe = TestProbe()
 
-    val leaderboardInfomer = system.actorOf(DummyLeaderBoardServiceGatewayActor(dummyLeaderboardServiceEndpoint))
+    val liveboardInfomer = system.actorOf(DummyLiveBoardServiceGatewayActor(dummyLiveboardServiceEndpoint))
 
     val custodianActorName = s"GameSessionCustodianActor-${gameSessionInfo.gameSessionUUID}"
 
@@ -118,7 +128,9 @@ class GameSessionCustodianBehaviourTest_1  extends TestKit(ActorSystem("ActorSys
         redisHost,
         redisPort,
         maxGameSessionLifetime,
-        leaderboardInformerProbe.ref,
+        liveboardInformerProbe.ref,
+        adminPanelNotifierActor,
+        lrsProbe.ref,
         ""
       ), custodianActorName)
 
@@ -142,9 +154,9 @@ class GameSessionCustodianBehaviourTest_1  extends TestKit(ActorSystem("ActorSys
 
     expectMsg(HuddleRESPGameSessionBodyWhenSuccessful(ExpandedMessage(2200, "Ended")))
 
-    leaderboardInformerProbe.expectMsg(
+    liveboardInformerProbe.expectMsg(
       Duration(5, "seconds"),
-      LeaderboardConsumableData(
+      LiveboardConsumableData(
         gameSessionInfo.companyID,
         gameSessionInfo.departmentID,
         gameSessionInfo.gameID,
@@ -154,7 +166,7 @@ class GameSessionCustodianBehaviourTest_1  extends TestKit(ActorSystem("ActorSys
         (evQuestionAnswered_1.questionAndAnswer.points + evQuestionAnswered_2.questionAndAnswer.points)
       ))
 
-    leaderboardInformerProbe.forward(leaderboardInfomer)
+    liveboardInformerProbe.forward(liveboardInfomer)
 
     /*val k = fetchGameSessionFromDB(gameSessionInfo) // 'k' is a list
 

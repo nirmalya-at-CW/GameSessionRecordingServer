@@ -45,9 +45,13 @@ lazy val root = (project in file(".")).
     libraryDependencies +=  "io.kamon" % "kamon-statsd_2.11" % "0.6.7",
     //libraryDependencies +=  "io.kamon" % "kamon-log-reporter_2.11" % "0.6.8",
     libraryDependencies +=  "io.kamon" % "kamon-akka-2.4_2.11" % "0.6.8",
-    libraryDependencies +=  "io.kamon" % "kamon-system-metrics_2.11" % "0.6.7"
+    libraryDependencies +=  "io.kamon" % "kamon-system-metrics_2.11" % "0.6.7",
+    libraryDependencies +=  "org.eclipse.jetty" % "jetty-servlet" % "9.4.8.v20171121",
+    libraryDependencies += "org.eclipse.jetty" % "jetty-client" % "9.4.8.v20171121"
 
-  )
+
+
+)
 
 aspectjSettings
 

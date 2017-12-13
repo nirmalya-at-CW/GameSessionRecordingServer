@@ -20,10 +20,17 @@ object RatingCalculator {
     val companyID: String
     val departmentID: String
     val playerID: String
+    val gameType: String
     val gameID: String
+    val groupID: String
     val totalPointsSoFar: Int
     val totalGamesSoFar: Int
   }
+
+  case class DBActionPlayerPerformanceRecord(
+            companyID: String, belongsToDepartment: String, playerID: String, gameID: String, gameType: String = "SP",
+            lastPlayedOn: LocalDateTime, timezoneApplicable: String,
+            pointsObtained: Int, timeTaken: Int, winsAchieved: Int)
 
   case class PlayerPerformanceSP(
                                   companyID: String, override val departmentID: String, playerID: String, gameID: String,
