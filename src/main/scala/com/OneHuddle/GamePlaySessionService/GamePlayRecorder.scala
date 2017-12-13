@@ -1,13 +1,11 @@
 package com.OneHuddle.GamePlaySessionService
 
-import kamon.Kamon
-
 /**
   * Created by nirmalya on 26/8/17.
   */
 object GamePlayRecorder extends App {
 
-  Kamon.start
+  // Kamon.start
 
   GameSessionRecordingServer.start(Array.empty[String])
 

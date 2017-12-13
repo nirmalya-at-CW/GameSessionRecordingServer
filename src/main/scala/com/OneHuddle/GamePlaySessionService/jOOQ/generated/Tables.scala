@@ -6,6 +6,7 @@ package com.OneHuddle.GamePlaySessionService.jOOQ.generated
 
 import com.OneHuddle.GamePlaySessionService.jOOQ.generated.tables.Datetimexperiment
 import com.OneHuddle.GamePlaySessionService.jOOQ.generated.tables.Gamesessionrecords
+import com.OneHuddle.GamePlaySessionService.jOOQ.generated.tables.Liveboardsnapshots
 import com.OneHuddle.GamePlaySessionService.jOOQ.generated.tables.Playerdetails
 import com.OneHuddle.GamePlaySessionService.jOOQ.generated.tables.Playerperformance
 
@@ -35,6 +36,11 @@ object Tables {
    * The table <code>OneHuddle.GameSessionRecords</code>.
    */
   val GAMESESSIONRECORDS = com.OneHuddle.GamePlaySessionService.jOOQ.generated.tables.Gamesessionrecords.GAMESESSIONRECORDS
+
+  /**
+   * The table <code>OneHuddle.LiveBoardSnapshots</code>.
+   */
+  val LIVEBOARDSNAPSHOTS = com.OneHuddle.GamePlaySessionService.jOOQ.generated.tables.Liveboardsnapshots.LIVEBOARDSNAPSHOTS
 
   /**
    * The table <code>OneHuddle.PlayerDetails</code>.

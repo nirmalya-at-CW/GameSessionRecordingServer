@@ -1,6 +1,5 @@
 package com.OneHuddle.GamePlaySessionService
 
-import kamon.Kamon
 
 /**
   * Created by nirmalya on 26/8/17.

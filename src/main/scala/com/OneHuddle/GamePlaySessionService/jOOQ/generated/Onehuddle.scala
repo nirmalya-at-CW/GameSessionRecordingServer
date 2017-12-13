@@ -6,6 +6,7 @@ package com.OneHuddle.GamePlaySessionService.jOOQ.generated
 
 import com.OneHuddle.GamePlaySessionService.jOOQ.generated.tables.Datetimexperiment
 import com.OneHuddle.GamePlaySessionService.jOOQ.generated.tables.Gamesessionrecords
+import com.OneHuddle.GamePlaySessionService.jOOQ.generated.tables.Liveboardsnapshots
 import com.OneHuddle.GamePlaySessionService.jOOQ.generated.tables.Playerdetails
 import com.OneHuddle.GamePlaySessionService.jOOQ.generated.tables.Playerperformance
 
@@ -54,6 +55,7 @@ class Onehuddle extends SchemaImpl("OneHuddle", DefaultCatalog.DEFAULT_CATALOG) 
     return Arrays.asList[Table[_]](
       Datetimexperiment.DATETIMEXPERIMENT,
       Gamesessionrecords.GAMESESSIONRECORDS,
+      Liveboardsnapshots.LIVEBOARDSNAPSHOTS,
       Playerdetails.PLAYERDETAILS,
       Playerperformance.PLAYERPERFORMANCE)
   }

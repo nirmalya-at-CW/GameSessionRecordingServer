@@ -6,6 +6,7 @@ package com.OneHuddle.GamePlaySessionService.jOOQ.generated
 
 import com.OneHuddle.GamePlaySessionService.jOOQ.generated.tables.Datetimexperiment
 import com.OneHuddle.GamePlaySessionService.jOOQ.generated.tables.Gamesessionrecords
+import com.OneHuddle.GamePlaySessionService.jOOQ.generated.tables.Liveboardsnapshots
 import com.OneHuddle.GamePlaySessionService.jOOQ.generated.tables.Playerdetails
 import com.OneHuddle.GamePlaySessionService.jOOQ.generated.tables.Playerperformance
 
@@ -36,6 +37,7 @@ object Indexes {
 
   val DATETIMEXPERIMENT_PRIMARY = Indexes0.DATETIMEXPERIMENT_PRIMARY
   val GAMESESSIONRECORDS_PRIMARY = Indexes0.GAMESESSIONRECORDS_PRIMARY
+  val LIVEBOARDSNAPSHOTS_PRIMARY = Indexes0.LIVEBOARDSNAPSHOTS_PRIMARY
   val PLAYERDETAILS_PRIMARY = Indexes0.PLAYERDETAILS_PRIMARY
   val PLAYERPERFORMANCE_PRIMARY = Indexes0.PLAYERPERFORMANCE_PRIMARY
 
@@ -46,6 +48,7 @@ object Indexes {
   private object Indexes0 extends AbstractKeys {
     val DATETIMEXPERIMENT_PRIMARY : Index = AbstractKeys.createIndex("PRIMARY", Datetimexperiment.DATETIMEXPERIMENT, Array[OrderField [_] ](Datetimexperiment.DATETIMEXPERIMENT.JUSTID), true)
     val GAMESESSIONRECORDS_PRIMARY : Index = AbstractKeys.createIndex("PRIMARY", Gamesessionrecords.GAMESESSIONRECORDS, Array[OrderField [_] ](Gamesessionrecords.GAMESESSIONRECORDS.COMPANYID, Gamesessionrecords.GAMESESSIONRECORDS.BELONGSTODEPARTMENT, Gamesessionrecords.GAMESESSIONRECORDS.PLAYERID, Gamesessionrecords.GAMESESSIONRECORDS.GAMEID, Gamesessionrecords.GAMESESSIONRECORDS.GAMESESSIONUUID), true)
+    val LIVEBOARDSNAPSHOTS_PRIMARY : Index = AbstractKeys.createIndex("PRIMARY", Liveboardsnapshots.LIVEBOARDSNAPSHOTS, Array[OrderField [_] ](Liveboardsnapshots.LIVEBOARDSNAPSHOTS.RECORDID, Liveboardsnapshots.LIVEBOARDSNAPSHOTS.SNAPSHOTTAKENAT, Liveboardsnapshots.LIVEBOARDSNAPSHOTS.TIMEZONEAPPLICABLE, Liveboardsnapshots.LIVEBOARDSNAPSHOTS.COMPANYID, Liveboardsnapshots.LIVEBOARDSNAPSHOTS.BELONGSTODEPARTMENT, Liveboardsnapshots.LIVEBOARDSNAPSHOTS.PLAYERID, Liveboardsnapshots.LIVEBOARDSNAPSHOTS.GAMEID, Liveboardsnapshots.LIVEBOARDSNAPSHOTS.GAMETYPE), true)
     val PLAYERDETAILS_PRIMARY : Index = AbstractKeys.createIndex("PRIMARY", Playerdetails.PLAYERDETAILS, Array[OrderField [_] ](Playerdetails.PLAYERDETAILS.COMPANYID, Playerdetails.PLAYERDETAILS.BELONGSTODEPARTMENT, Playerdetails.PLAYERDETAILS.PLAYERID), true)
     val PLAYERPERFORMANCE_PRIMARY : Index = AbstractKeys.createIndex("PRIMARY", Playerperformance.PLAYERPERFORMANCE, Array[OrderField [_] ](Playerperformance.PLAYERPERFORMANCE.RECORDID, Playerperformance.PLAYERPERFORMANCE.COMPANYID, Playerperformance.PLAYERPERFORMANCE.BELONGSTODEPARTMENT, Playerperformance.PLAYERPERFORMANCE.PLAYERID, Playerperformance.PLAYERPERFORMANCE.GAMEID, Playerperformance.PLAYERPERFORMANCE.GAMETYPE, Playerperformance.PLAYERPERFORMANCE.GROUPID, Playerperformance.PLAYERPERFORMANCE.LASTPLAYEDON, Playerperformance.PLAYERPERFORMANCE.TIMEZONEAPPLICABLE), true)
   }

@@ -14,6 +14,7 @@ import akka.stream.scaladsl.Sink
 import akka.stream.{ActorMaterializer, Materializer}
 import akka.util.Timeout
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.ExternalAPIParams._
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.LiveBoardSnapshotBunch
 import com.redis.RedisClient
 import com.typesafe.config.ConfigFactory
 import de.heikoseeberger.akkahttpjson4s.Json4sSupport
@@ -279,6 +280,25 @@ object GameSessionRecordingServer {
             }
           }
         }
+    }
+  }
+
+  def liveBoardSnapshotSaveRoute(implicit mat: Materializer) = {
+    import Json4sSupport._
+    import akka.http.scaladsl.server.Directives._
+
+    implicit val serialization = native.Serialization
+    implicit val formats       = DefaultFormats
+
+    post {
+      pathPrefix("liveboardSnapshot") {
+        entity(as[LiveBoardSnapshotBunch]) { liveBoardSnapShotBunch =>
+          complete {
+            println(s"req: $liveBoardSnapShotBunch")
+            (sessionHandlingSPOC ? liveBoardSnapShotBunch).mapTo[HuddleRESPGameSessionBody]
+          }
+        }
+      }
     }
   }
 

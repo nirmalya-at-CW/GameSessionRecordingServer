@@ -6,10 +6,12 @@ package com.OneHuddle.GamePlaySessionService.jOOQ.generated
 
 import com.OneHuddle.GamePlaySessionService.jOOQ.generated.tables.Datetimexperiment
 import com.OneHuddle.GamePlaySessionService.jOOQ.generated.tables.Gamesessionrecords
+import com.OneHuddle.GamePlaySessionService.jOOQ.generated.tables.Liveboardsnapshots
 import com.OneHuddle.GamePlaySessionService.jOOQ.generated.tables.Playerdetails
 import com.OneHuddle.GamePlaySessionService.jOOQ.generated.tables.Playerperformance
 import com.OneHuddle.GamePlaySessionService.jOOQ.generated.tables.records.DatetimexperimentRecord
 import com.OneHuddle.GamePlaySessionService.jOOQ.generated.tables.records.GamesessionrecordsRecord
+import com.OneHuddle.GamePlaySessionService.jOOQ.generated.tables.records.LiveboardsnapshotsRecord
 import com.OneHuddle.GamePlaySessionService.jOOQ.generated.tables.records.PlayerdetailsRecord
 import com.OneHuddle.GamePlaySessionService.jOOQ.generated.tables.records.PlayerperformanceRecord
 
@@ -41,6 +43,7 @@ object Keys {
   // IDENTITY definitions
   // -------------------------------------------------------------------------
 
+  val IDENTITY_LIVEBOARDSNAPSHOTS = Identities0.IDENTITY_LIVEBOARDSNAPSHOTS
   val IDENTITY_PLAYERPERFORMANCE = Identities0.IDENTITY_PLAYERPERFORMANCE
 
   // -------------------------------------------------------------------------
@@ -49,6 +52,7 @@ object Keys {
 
   val KEY_DATETIMEXPERIMENT_PRIMARY = UniqueKeys0.KEY_DATETIMEXPERIMENT_PRIMARY
   val KEY_GAMESESSIONRECORDS_PRIMARY = UniqueKeys0.KEY_GAMESESSIONRECORDS_PRIMARY
+  val KEY_LIVEBOARDSNAPSHOTS_PRIMARY = UniqueKeys0.KEY_LIVEBOARDSNAPSHOTS_PRIMARY
   val KEY_PLAYERDETAILS_PRIMARY = UniqueKeys0.KEY_PLAYERDETAILS_PRIMARY
   val KEY_PLAYERPERFORMANCE_PRIMARY = UniqueKeys0.KEY_PLAYERPERFORMANCE_PRIMARY
 
@@ -62,12 +66,14 @@ object Keys {
   // -------------------------------------------------------------------------
 
   private object Identities0 extends AbstractKeys {
+    val IDENTITY_LIVEBOARDSNAPSHOTS : Identity[LiveboardsnapshotsRecord, Integer] = AbstractKeys.createIdentity(Liveboardsnapshots.LIVEBOARDSNAPSHOTS, Liveboardsnapshots.LIVEBOARDSNAPSHOTS.RECORDID)
     val IDENTITY_PLAYERPERFORMANCE : Identity[PlayerperformanceRecord, Integer] = AbstractKeys.createIdentity(Playerperformance.PLAYERPERFORMANCE, Playerperformance.PLAYERPERFORMANCE.RECORDID)
   }
 
   private object UniqueKeys0 extends AbstractKeys {
     val KEY_DATETIMEXPERIMENT_PRIMARY : UniqueKey[DatetimexperimentRecord] = AbstractKeys.createUniqueKey(Datetimexperiment.DATETIMEXPERIMENT, "KEY_DateTimExperiment_PRIMARY", Datetimexperiment.DATETIMEXPERIMENT.JUSTID)
     val KEY_GAMESESSIONRECORDS_PRIMARY : UniqueKey[GamesessionrecordsRecord] = AbstractKeys.createUniqueKey(Gamesessionrecords.GAMESESSIONRECORDS, "KEY_GameSessionRecords_PRIMARY", Gamesessionrecords.GAMESESSIONRECORDS.COMPANYID, Gamesessionrecords.GAMESESSIONRECORDS.BELONGSTODEPARTMENT, Gamesessionrecords.GAMESESSIONRECORDS.PLAYERID, Gamesessionrecords.GAMESESSIONRECORDS.GAMEID, Gamesessionrecords.GAMESESSIONRECORDS.GAMESESSIONUUID)
+    val KEY_LIVEBOARDSNAPSHOTS_PRIMARY : UniqueKey[LiveboardsnapshotsRecord] = AbstractKeys.createUniqueKey(Liveboardsnapshots.LIVEBOARDSNAPSHOTS, "KEY_LiveBoardSnapshots_PRIMARY", Liveboardsnapshots.LIVEBOARDSNAPSHOTS.RECORDID, Liveboardsnapshots.LIVEBOARDSNAPSHOTS.SNAPSHOTTAKENAT, Liveboardsnapshots.LIVEBOARDSNAPSHOTS.TIMEZONEAPPLICABLE, Liveboardsnapshots.LIVEBOARDSNAPSHOTS.COMPANYID, Liveboardsnapshots.LIVEBOARDSNAPSHOTS.BELONGSTODEPARTMENT, Liveboardsnapshots.LIVEBOARDSNAPSHOTS.PLAYERID, Liveboardsnapshots.LIVEBOARDSNAPSHOTS.GAMEID, Liveboardsnapshots.LIVEBOARDSNAPSHOTS.GAMETYPE)
     val KEY_PLAYERDETAILS_PRIMARY : UniqueKey[PlayerdetailsRecord] = AbstractKeys.createUniqueKey(Playerdetails.PLAYERDETAILS, "KEY_PlayerDetails_PRIMARY", Playerdetails.PLAYERDETAILS.COMPANYID, Playerdetails.PLAYERDETAILS.BELONGSTODEPARTMENT, Playerdetails.PLAYERDETAILS.PLAYERID)
     val KEY_PLAYERPERFORMANCE_PRIMARY : UniqueKey[PlayerperformanceRecord] = AbstractKeys.createUniqueKey(Playerperformance.PLAYERPERFORMANCE, "KEY_PlayerPerformance_PRIMARY", Playerperformance.PLAYERPERFORMANCE.RECORDID, Playerperformance.PLAYERPERFORMANCE.COMPANYID, Playerperformance.PLAYERPERFORMANCE.BELONGSTODEPARTMENT, Playerperformance.PLAYERPERFORMANCE.PLAYERID, Playerperformance.PLAYERPERFORMANCE.GAMEID, Playerperformance.PLAYERPERFORMANCE.GAMETYPE, Playerperformance.PLAYERPERFORMANCE.GROUPID, Playerperformance.PLAYERPERFORMANCE.LASTPLAYEDON, Playerperformance.PLAYERPERFORMANCE.TIMEZONEAPPLICABLE)
   }

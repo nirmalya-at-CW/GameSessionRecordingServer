@@ -56,10 +56,22 @@ class GameSessionCustodianActor (
 
   //TODO: instead of making this a direct child, we should create a router and encapsulate that with HTTP apis.
   //TODO: we should pass a different dispatcher (properly configured) to the actor below; currently it is the same dispatcher
-  val gameSessionRecordDBButlerActor = context.system.actorOf(GameSessionDBButlerActor(dbAccessURL, context.dispatcher))
+  val gameSessionRecordDBButlerActor =
+        context
+          .system
+          .actorOf(
+            GameSessionDBButlerActor(dbAccessURL, context.dispatcher),
+            s"GameSessionRecordDBButler-${gameSessionInfo.gameSessionUUID}"
+          )
   context.watch(gameSessionStateHolderActor)
 
-  val playerPerformanceDBButlerActor = context.system.actorOf(PlayerPerformanceDBButlerActor(dbAccessURL, context.dispatcher))
+  val playerPerformanceDBButlerActor =
+    context
+      .system
+      .actorOf(
+        PlayerPerformanceDBButlerActor(
+          dbAccessURL, context.dispatcher
+        ), s"PlayerPerformanceDBButler-${gameSessionInfo.gameSessionUUID}")
   context.watch(playerPerformanceDBButlerActor)
 
   def gamePlayIsOnState: Receive = LoggingReceive.withLabel("gamePlayIsOnState") {
@@ -161,7 +173,7 @@ class GameSessionCustodianActor (
           gameSessionInfo.playerID,
           gameSessionInfo.gameSessionUUID)
       )
-      println(s"|**********| message sent to adminPanelNotifierActor(${adminPanelNotifierActor.path})")
+
       log.info(s"GameSession ${gameSessionInfo.gameSessionUUID}, ends at ${ev.endedAt}. Cause: Timed out.")
       context.become(gamePlayIsBarredState)
 

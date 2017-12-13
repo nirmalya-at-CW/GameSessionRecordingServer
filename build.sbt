@@ -41,11 +41,11 @@ lazy val root = (project in file(".")).
     libraryDependencies +=  "com.novocode" % "junit-interface" % "0.11" % "test",
     libraryDependencies +=  "org.hamcrest" % "hamcrest-all" % "1.3",
     libraryDependencies +=  "com.mashape.unirest" % "unirest-java" % "1.4.9",
-    libraryDependencies +=  "io.kamon" % "kamon-core_2.11" % "0.6.7",
-    libraryDependencies +=  "io.kamon" % "kamon-statsd_2.11" % "0.6.7",
-    //libraryDependencies +=  "io.kamon" % "kamon-log-reporter_2.11" % "0.6.8",
-    libraryDependencies +=  "io.kamon" % "kamon-akka-2.4_2.11" % "0.6.8",
-    libraryDependencies +=  "io.kamon" % "kamon-system-metrics_2.11" % "0.6.7",
+//    libraryDependencies +=  "io.kamon" % "kamon-core_2.11" % "0.6.7",
+//    libraryDependencies +=  "io.kamon" % "kamon-statsd_2.11" % "0.6.7",
+//    //libraryDependencies +=  "io.kamon" % "kamon-log-reporter_2.11" % "0.6.8",
+//    libraryDependencies +=  "io.kamon" % "kamon-akka-2.4_2.11" % "0.6.8",
+//    libraryDependencies +=  "io.kamon" % "kamon-system-metrics_2.11" % "0.6.7",
     libraryDependencies +=  "org.eclipse.jetty" % "jetty-servlet" % "9.4.8.v20171121",
     libraryDependencies += "org.eclipse.jetty" % "jetty-client" % "9.4.8.v20171121"
 
@@ -55,7 +55,7 @@ lazy val root = (project in file(".")).
 
 aspectjSettings
 
-javaOptions in run <++= AspectjKeys.weaverOptions in Aspectj
+//javaOptions in run <++= AspectjKeys.weaverOptions in Aspectj
 
 fork in run := true
 

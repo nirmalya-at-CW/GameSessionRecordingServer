@@ -5,17 +5,15 @@ import java.time.{Instant, ZoneId, ZoneOffset}
 import java.util.concurrent.TimeUnit
 
 import akka.actor.ActorSystem
-import akka.testkit.{EventFilter, ImplicitSender, TestKit, TestProbe}
+import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.OneHuddle.GamePlaySessionService.GameSessionCustodianActor
-import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.DBHatch.DBActionGameSessionRecord
+
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.ExternalAPIParams.{ExpandedMessage, HuddleRESPGameSessionBodyWhenSuccessful}
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.HuddleGame.EvInitiated
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{GameSession, GameSessionEndedByTimeOut, HuddleGame, QuestionAnswerTuple}
 import com.OneHuddle.GamePlaySessionService.MariaDBAware.{GameSessionDBButlerActor, NonExistentGameSessionRecord}
 import com.typesafe.config.ConfigFactory
-import com.OneHuddle.GamePlaySessionService.jOOQ.generated.Tables._
-import org.jooq.SQLDialect
-import org.jooq.impl.DSL
+
 import org.nirmalya.experiment.test.common._
 import org.scalatest.{BeforeAndAfterAll, MustMatchers, WordSpecLike}
 
@@ -45,7 +43,7 @@ class GameSessionCustodianBehaviourTest_2  extends TestKit(ActorSystem(
             maxGameSessionLifetime {
 
               // Unit is expressed in seconds
-              duration = 20
+              duration = 2
             }
 
             maxResponseTimeLimit {
@@ -119,7 +117,7 @@ class GameSessionCustodianBehaviourTest_2  extends TestKit(ActorSystem(
 
     "correctly deal with timeout when no question answered after the first two" in {
 
-      val gameSessionInfo = GameSession("CW","QA","G01","P01","Tic-Tac-Toe","UUID-9",playedInTimezone = "Asia/Calcutta")
+      val gameSessionInfo = GameSession("1Huddle","Sales","G001","P001","Tic-Tac-Toe","UUID-19",playedInTimezone = "Asia/Calcutta")
 
       val gameStartsAt  = System.currentTimeMillis()
       val evInitiated = EvInitiated(gameStartsAt)
@@ -163,8 +161,8 @@ class GameSessionCustodianBehaviourTest_2  extends TestKit(ActorSystem(
 
 
       // We are effectively whiling away time so that the GameSession times out.
-      // Assumption: maximum duration before a session times out is 20 seconds, from application.conf
-      expectNoMsg(maxGameSessionLifetime + Duration(2,"seconds"))
+      // Assumption: maximum duration before a session times out is as per application.conf
+      expectNoMsg(maxGameSessionLifetime + Duration(3,"seconds"))
 
       val k = fetchGameSessionFromDB(gameSessionInfo) // 'k' is a list
 

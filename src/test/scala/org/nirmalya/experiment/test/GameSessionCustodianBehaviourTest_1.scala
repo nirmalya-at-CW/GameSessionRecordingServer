@@ -12,7 +12,7 @@ import com.OneHuddle.GamePlaySessionService.GameSessionCustodianActor
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.ExternalAPIParams.{ExpandedMessage, HuddleRESPGameSessionBodyWhenSuccessful}
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{ComputedGameSessionRegSP, EmittedWhenGameSessionIsFinished, GameSession, GameSessionEndedByPlayer, GameSessionEndedByTimeOut, HuddleGame, LiveboardConsumableData, QuestionAnswerTuple}
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.HuddleGame.EvInitiated
-import com.OneHuddle.GamePlaySessionService.MariaDBAware.{GameSessionDBButlerActor, NonExistentComputedGameSession, NonExistentGameSessionRecord}
+import com.OneHuddle.GamePlaySessionService.MariaDBAware.{NonExistentComputedGameSession, NonExistentGameSessionRecord}
 
 
 
@@ -73,7 +73,7 @@ class GameSessionCustodianBehaviourTest_1  extends TestKit(ActorSystem("ActorSys
     "respond with success on initiation of a GameSession" in {
 
        val gameSessionInfo = GameSession("CW","QA","G01","P01","Tic-Tac-Toe","UUID-1",playedInTimezone = "Asia/Calcutta")
-       val liveboardInfomer = system.actorOf(DummyLiveBoardServiceGatewayActor(dummyLiveboardServiceEndpoint))
+       val liveboardInfomer = system.actorOf(DummyLiveBoardServiceGatewayActor(dummyLiveboardServiceEndpoint),"DummyLiveBoardServiceGatewayActor-UUID-1")
 
 
       val custodianActorName = s"GameSessionCustodianActor-${gameSessionInfo.gameSessionUUID}"
@@ -118,7 +118,7 @@ class GameSessionCustodianBehaviourTest_1  extends TestKit(ActorSystem("ActorSys
 
     val liveboardInformerProbe = TestProbe()
 
-    val liveboardInfomer = system.actorOf(DummyLiveBoardServiceGatewayActor(dummyLiveboardServiceEndpoint))
+    val liveboardInfomer = system.actorOf(DummyLiveBoardServiceGatewayActor(dummyLiveboardServiceEndpoint),"DummyLiveBoardServiceGatewayActor-UUID-4")
 
     val custodianActorName = s"GameSessionCustodianActor-${gameSessionInfo.gameSessionUUID}"
 

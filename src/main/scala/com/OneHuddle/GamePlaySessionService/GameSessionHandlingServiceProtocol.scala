@@ -55,6 +55,9 @@ object GameSessionHandlingServiceProtocol {
     case class   HuddleRESPGameSessionBodyWhenFailed(
                    message: ExpandedMessage, contents: Option[Map[String,String]]=None, opSuccess: Boolean = false)
                  extends HuddleRESPGameSessionBody
+    case class   HuddleRESPLeaderboardSnapshotsReceivedAlright(
+                   message: ExpandedMessage, contents: Option[Map[String,String]]=None, opSuccess: Boolean = false)
+                 extends HuddleRESPGameSessionBody
   }
 
   sealed trait GameSessionEndingReason
@@ -149,6 +152,13 @@ object GameSessionHandlingServiceProtocol {
                groupID: String, gameSessionUUID: String, score: Int
              )
 
+  case class LiveBoardSnapshot(takenAt: ZonedDateTime,timezoneApplicable: String,
+               companyID: String, departmentID: String, gameID: String, playerID: String,
+               gameType: String, groupID: String, rankComputed: Int
+             )
+
+  case class LiveBoardSnapshotBunch(bunch: List[LiveBoardSnapshot])
+
   trait PlayerPerformancePerLastSession {
     val companyID: String
     val belongsToDepartment: String
@@ -208,7 +218,8 @@ object GameSessionHandlingServiceProtocol {
         classOf[REQStartAGameWith],
         classOf[RedisRecordingStatus],
         classOf[HuddleRESPGameSessionBody],
-        classOf[LiveboardConsumableData]
+        classOf[LiveboardConsumableData],
+        classOf[LiveBoardSnapshotBunch]
       )
     )
   )
@@ -300,6 +311,11 @@ object GameSessionHandlingServiceProtocol {
           companyID: String, belongsToDepartment: String, playerID: String, gameID: String, gameType: String, groupID: String,
           lastPlayedOn: LocalDateTime, timezoneApplicable: String,
           pointsObtained: Int, timeTaken: Int, winsAchieved: Int)
+
+    case class DBActionLiveBoardSnapshotRecord(
+          takenAtInUTC: LocalDateTime, timezoneApplicable: String,
+          companyID: String, belongsToDepartment: String, playerID: String, gameID: String, gameType: String, groupID: String,
+          rankComputed: Int)
     
     sealed trait DBAction
     case class   DBActionInsert(r:DBActionGameSessionRecord) extends DBAction

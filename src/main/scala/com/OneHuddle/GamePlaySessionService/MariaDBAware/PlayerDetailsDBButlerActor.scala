@@ -49,7 +49,7 @@ object PlayerDetailsButlerActor {
 
   def apply(dbAccessURL: String, dbAccessDispatcher: ExecutionContextExecutor): Props =
 
-             Props(new GameSessionDBButlerActor(dbAccessURL,dbAccessDispatcher))
+             Props(new LiveBoardSnapshotDBButlerActor(dbAccessURL,dbAccessDispatcher))
 
   def retrieve(c: Connection, companyName: String, department: String, playerID: String): List[PlayerDetails] = {
 

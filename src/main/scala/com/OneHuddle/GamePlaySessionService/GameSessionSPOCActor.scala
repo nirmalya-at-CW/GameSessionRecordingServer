@@ -8,8 +8,8 @@ import akka.pattern._
 import akka.util.Timeout
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.EmittedEvents.{DataSharedWithAdminPanel, EvGameSessionLaunched}
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.ExternalAPIParams._
-import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{ExternalAPIParams, GameSession, HuddleGame, QuestionAnswerTuple}
-import com.OneHuddle.GamePlaySessionService.MariaDBAware.GameSessionDBButlerActor
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{ExternalAPIParams, GameSession, HuddleGame, LiveBoardSnapshot, LiveBoardSnapshotBunch, QuestionAnswerTuple}
+import com.OneHuddle.GamePlaySessionService.MariaDBAware.{GameSessionDBButlerActor, LiveBoardSnapshotDBButlerActor}
 import com.OneHuddle.xAPI.ScormInformationExchangeActor
 
 import scala.concurrent.Future
@@ -23,6 +23,7 @@ import scala.util.{Failure, Success}
 class GameSessionSPOCActor(gameSessionFinishedEventEmitter: ActorRef) extends Actor with ActorLogging {
 
   case object ShutYourself
+  case class  InitiateLiveBoardSaveAction(l: List[LiveBoardSnapshot])
 
 
   implicit val executionContext = context.dispatcher
@@ -49,6 +50,8 @@ class GameSessionSPOCActor(gameSessionFinishedEventEmitter: ActorRef) extends Ac
 
   val adminPanelNotifierActor = context.actorOf(AdminPanelNotifierActor(), "AdminPanelNotifier-by-SPOC")
 
+  val liveBoardSnapshotSavingActor = context.actorOf(LiveBoardSnapshotDBButlerActor(dbAccessURL, executionContext))
+
   // TODO: arrange for a specific dispatcher for the actors, accessing databases.
   val gameSessionRecordDBButler = context.actorOf(GameSessionDBButlerActor(dbAccessURL, context.system.dispatcher))
 
@@ -63,18 +66,37 @@ class GameSessionSPOCActor(gameSessionFinishedEventEmitter: ActorRef) extends Ac
 
   def receive = LoggingReceive.withLabel("SPOC") {
 
+    case l: LiveBoardSnapshotBunch  =>
+      val originalSender = sender
+      log.info(s"LiveBoardSnapShot bunch received, of ${l.bunch.length} entries")
+      self ! InitiateLiveBoardSaveAction(l.bunch)
+      originalSender ! HuddleRESPLeaderboardSnapshotsReceivedAlright(
+                            ExpandedMessage(200, s"${l.bunch.length} records received"),opSuccess=true
+                       )
+
+
+    case bunch: InitiateLiveBoardSaveAction =>
+
+      Future{
+        bunch.l.foreach (entry => liveBoardSnapshotSavingActor ! entry)
+      }.onComplete {
+
+        case Success(r)  => log.info(s"Saving leaderboard snapshots: success, ${bunch.l.length} records.")
+        case Failure(ex) => log.info(s"Saving leaderboard snapshots: failure, some or all of ${bunch.l.length} records weren't saved. Refer to logs.")
+      }
+
     case r: ExternalAPIParams.REQStartAGameWith =>
       val gameSessionInfo = GameSession(
-        r.companyID,
-        r.departmentID,
-        r.gameID,
-        r.playerID,
-        r.gameName,
-        r.gameSessionUUID,
-        r.groupID.getOrElse("NOTSET"),
-        r.gameType,
-        r.playedInTimezone
-      )
+                                r.companyID,
+                                r.departmentID,
+                                r.gameID,
+                                r.playerID,
+                                r.gameName,
+                                r.gameSessionUUID,
+                                r.groupID.getOrElse("NOTSET"),
+                                r.gameType,
+                                r.playedInTimezone
+                              )
 
       if (activeGameSessionCustodians.isDefinedAt(r.gameSessionUUID))
         sender ! HuddleRESPGameSessionBodyWhenFailed(ExpandedMessage(1200, s"GameSession with $r is already active."))

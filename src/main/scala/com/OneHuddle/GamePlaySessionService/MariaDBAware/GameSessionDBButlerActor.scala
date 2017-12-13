@@ -31,7 +31,7 @@ class GameSessionDBButlerActor(dbAccessURL: String, val dbAccessDispatcher: Exec
 
   override def receive: Receive =  {
 
-    case finishedAndComputedGameSession: ComputedGameSessionRegSP =>
+    case finishedAndComputedGameSession : ComputedGameSessionRegSP =>
 
       log.info(s"Database action=Insert, GameSession=${finishedAndComputedGameSession.gameSessionUUID} starts.")
 
@@ -63,7 +63,7 @@ class GameSessionDBButlerActor(dbAccessURL: String, val dbAccessDispatcher: Exec
 
       sender ! (if (rows == 1) DBActionInsertSuccess(1) else DBActionInsertFailure(s"$rows inserted"))
 
-    case u: DBActionPlayerToUpdate   =>
+    case m: Any   => log.info("Unknown message $m received, no database action possible." )
 
 
   }
