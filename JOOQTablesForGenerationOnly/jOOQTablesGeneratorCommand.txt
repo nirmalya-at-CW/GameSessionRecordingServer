@@ -1,0 +1,1 @@
+java -classpath ./jOOQ-3.10.0/jOOQ-lib/jooq-3.10.0.jar:./jOOQ-3.10.0/jOOQ-lib/jooq-meta-3.10.0.jar:./jOOQ-3.10.0/jOOQ-lib/jooq-codegen-3.10.0.jar:./jOOQ-3.10.0/jOOQ-lib/mysql-connector-java-5.1.18-bin.jar:./mariadb-java-client-2.1.2.jar org.jooq.util.GenerationTool library.xml
