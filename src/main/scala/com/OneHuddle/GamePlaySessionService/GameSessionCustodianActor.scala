@@ -195,6 +195,7 @@ class GameSessionCustodianActor (
         ev.computedGameSession.timeTakenToFinish
       )
 
+      println(s"|**********| ev.computedGameSession.totalPointsObtained(${ev.computedGameSession.totalPointsObtained})")
       lrsExchangeActor ! UpdateLRSGamePlayed(playerPerformanceRecordSP)
 
       gameSessionRecordDBButlerActor ! ev.computedGameSession
