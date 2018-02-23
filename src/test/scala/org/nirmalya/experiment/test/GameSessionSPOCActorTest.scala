@@ -46,6 +46,13 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
     TimeUnit.SECONDS
   )
 
+  val maxResponseTimeLimit = Duration(
+    config.
+      getConfig("GameSession.maxResponseTimeLimit").
+      getString("duration").
+      toInt,
+    "seconds")
+
 
   // val emitterActor = system.actorOf(GameSessionCompletionEmitterActor(List("http://httpbin.org/put")))
 
@@ -127,7 +134,7 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
       }
     }
 
-    "stop GameSession Actor and itself, automatically after playing and then remaining inactive for certain time" in {
+    "stop GameSessionCustodian Actor and itself, automatically after playing and then remaining inactive for certain time" in {
 
       val spocActor = system.actorOf(GameSessionSPOCActor(emitterActor),"SPOCtActorForTest-3")
 
@@ -201,13 +208,23 @@ class GameSessionSPOCActorTest extends TestKit(ActorSystem("HuddleGame-system"))
       // We expect that because the session must have timed-out and hence, terminated, the SPOC Actor will not find the
       // session alive. Therefore, it should immediately respond to indicate, the session's absence
 
-      expectMsgPF(Duration(1, "second")) {
+      fishForMessage(maxResponseTimeLimit + Duration(2,"second"), hint = "neither TimeOut nor non-existent sessionID") {
 
         case m: HuddleRESPGameSessionBodyWhenFailed =>
-          m.opSuccess == true               &&
+
+          m.opSuccess == false              &&
           m.message.successId     == 1300   &&
-          m.message.description   == s"No gameSession (${reqStart.gameSessionUUID}) exists" &&
+            (
+              ((m.message.description.contains(reqStart.gameSessionUUID)) &&
+               (m.message.description.contains("No gameSession"))   &&
+               (m.message.description.contains("exists"))
+              )
+            )   &&
           m.contents              == None
+
+        case e: Any =>
+           println(s"|****** Unexpected message ${e} ")
+           false
       }
     }
   }

@@ -186,8 +186,6 @@ class GameSessionStateHolderActor(val cleanDataOnExit: Boolean,
           (accumulator._1 + scoreForQ, accumulator._2 + timeTakenForQ)
         })
 
-
-        println(s"|***** total score ${totalScoreAndTime._1}")
         val sessionBeganAtTimezoneApplied =
           Instant.ofEpochMilli(d.sessionBeganAt).atZone(ZoneId.of(seededWithSession.playedInTimezone))
         val sessionEndedAtTimezoneApplied =

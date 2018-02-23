@@ -10,6 +10,7 @@ import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.P
 import org.jooq.SQLDialect
 import org.jooq.impl.DSL
 import com.OneHuddle.GamePlaySessionService.jOOQ.generated.Tables._
+import com.typesafe.config.ConfigFactory
 
 import collection.JavaConverters._
 import scala.concurrent.ExecutionContextExecutor
@@ -63,7 +64,16 @@ class PlayerPerformanceDBButlerActor(
 
 }
 
-object PlayerPerformanceDBButlerActor {
+object PlayerPerformanceDBButlerActor extends JOOQDBDialectDeterminer {
+
+  val localConfig =  ConfigFactory.load()
+
+  val jooqDialectString =
+    localConfig
+      .getConfig("GameSession.database")
+      .getString("jOOQDBDialect")
+
+  val dialectToUse = chooseDialect(if (jooqDialectString.isEmpty) "MARIADB" else jooqDialectString)
 
   def apply(dbAccessURL: String, dbAccessDispatcher: ExecutionContextExecutor): Props =
 
@@ -73,7 +83,8 @@ object PlayerPerformanceDBButlerActor {
         c: Connection, companyID: String, department: String, gameID: String, playerID: String)
       : List[DBActionPlayerPerformanceRecord] = {
 
-    val e = DSL.using(c, SQLDialect.MARIADB)
+    // val e = DSL.using(c, SQLDialect.MARIADB)
+    val e = DSL.using(c, dialectToUse)
     val x = PLAYERPERFORMANCE as "x"
 
     val k = e.selectFrom(PLAYERPERFORMANCE)
@@ -98,7 +109,8 @@ object PlayerPerformanceDBButlerActor {
         c: Connection, playerPerformanceData: DBActionPlayerPerformanceRecord
       ) = {
 
-    val e = DSL.using(c, SQLDialect.MARIADB)
+    // val e = DSL.using(c, SQLDialect.MARIADB)
+    val e = DSL.using(c, SQLDialect.MYSQL_5_7)
 
     val playerPerformanceRecord = e.newRecord(PLAYERPERFORMANCE)
 

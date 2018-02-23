@@ -53,7 +53,11 @@ class GameSessionSPOCActor(gameSessionFinishedEventEmitter: ActorRef) extends Ac
   val liveBoardSnapshotSavingActor = context.actorOf(LiveBoardSnapshotDBButlerActor(dbAccessURL, executionContext))
 
   // TODO: arrange for a specific dispatcher for the actors, accessing databases.
-  val gameSessionRecordDBButler = context.actorOf(GameSessionDBButlerActor(dbAccessURL, context.system.dispatcher))
+  val gameSessionRecordDBButler =
+       context.actorOf(
+         GameSessionDBButlerActor(
+           dbAccessURL,
+           context.system.dispatcher))
 
   var activeGameSessionCustodians: Map[String, ActorRef] = Map.empty
 
@@ -68,7 +72,7 @@ class GameSessionSPOCActor(gameSessionFinishedEventEmitter: ActorRef) extends Ac
 
     case l: LiveBoardSnapshotBunch  =>
       val originalSender = sender
-      log.info(s"LiveBoardSnapShot bunch received, of ${l.bunch.length} entries")
+      log.info(s"LiveBoardSnapShotBunch.entryCount=${l.bunch.length} received.")
       self ! InitiateLiveBoardSaveAction(l.bunch)
       originalSender ! HuddleRESPLeaderboardSnapshotsReceivedAlright(
                             ExpandedMessage(200, s"${l.bunch.length} records received"),opSuccess=true
@@ -81,8 +85,8 @@ class GameSessionSPOCActor(gameSessionFinishedEventEmitter: ActorRef) extends Ac
         bunch.l.foreach (entry => liveBoardSnapshotSavingActor ! entry)
       }.onComplete {
 
-        case Success(r)  => log.info(s"Saving leaderboard snapshots: success, ${bunch.l.length} records.")
-        case Failure(ex) => log.info(s"Saving leaderboard snapshots: failure, some or all of ${bunch.l.length} records weren't saved. Refer to logs.")
+        case Success(r)  => log.info(s"LeaderboardSnapshots, saving=success, recordsCount=${bunch.l.length}.")
+        case Failure(ex) => log.info(s"LeaderboardSnapshots, saving=failure,, recordsCount=${bunch.l.length}, some or all may not have been saved. Refer to logs.")
       }
 
     case r: ExternalAPIParams.REQStartAGameWith =>
@@ -262,7 +266,7 @@ class GameSessionSPOCActor(gameSessionFinishedEventEmitter: ActorRef) extends Ac
 
     case (m: Any) =>
 
-      println("Unknown message = [" + m + "] received!")
+      log.info(s"Unknown message=$m, received!")
   }
 
 }

@@ -3,12 +3,10 @@ package com.OneHuddle.GamePlaySessionService.MariaDBAware
 import java.sql.{Connection, DriverManager}
 
 import akka.actor.{Actor, ActorLogging, Props}
-
-
 import com.OneHuddle.GamePlaySessionService.jOOQ.generated.Tables._
+import com.typesafe.config.ConfigFactory
+
 import collection.JavaConverters._
-
-
 import org.jooq.SQLDialect
 import org.jooq.impl.DSL
 
@@ -45,7 +43,16 @@ class PlayerDetailsButlerActor(
 
 }
 
-object PlayerDetailsButlerActor {
+object PlayerDetailsButlerActor extends JOOQDBDialectDeterminer {
+
+  val localConfig =  ConfigFactory.load()
+
+  val jooqDialectString =
+    localConfig
+      .getConfig("GameSession.database")
+      .getString("jOOQDBDialect")
+
+  val dialectToUse = chooseDialect(if (jooqDialectString.isEmpty) "MARIADB" else jooqDialectString)
 
   def apply(dbAccessURL: String, dbAccessDispatcher: ExecutionContextExecutor): Props =
 
@@ -53,8 +60,7 @@ object PlayerDetailsButlerActor {
 
   def retrieve(c: Connection, companyName: String, department: String, playerID: String): List[PlayerDetails] = {
 
-    val c = DriverManager.getConnection("jdbc:mariadb://localhost:3306/OneHuddle","nuovo","nuovo123")
-    val e = DSL.using(c, SQLDialect.MARIADB)                             //
+    val e = DSL.using(c, dialectToUse)                             //
     val x = PLAYERDETAILS as "x"
 
     val k = e.select()

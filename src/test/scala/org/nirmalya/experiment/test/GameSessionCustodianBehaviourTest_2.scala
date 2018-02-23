@@ -32,6 +32,9 @@ class GameSessionCustodianBehaviourTest_2  extends TestKit(ActorSystem(
 
               host = "localhost"
               port = 6379
+
+      |       // host = "172.31.42.169"
+      |       // port = 7003
             }
 
             availableAt {

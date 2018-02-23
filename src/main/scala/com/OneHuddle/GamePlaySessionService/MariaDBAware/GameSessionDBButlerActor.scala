@@ -2,17 +2,15 @@ package com.OneHuddle.GamePlaySessionService.MariaDBAware
 
 import java.sql.{Connection, DriverManager, Timestamp}
 
-
 import akka.actor.{Actor, ActorLogging, Props}
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.DBHatch._
 import org.jooq.SQLDialect
 import org.jooq.impl.DSL
 import com.OneHuddle.GamePlaySessionService.jOOQ.generated.Tables._
-
-
 import java.time._
 
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.ComputedGameSessionRegSP
+import com.typesafe.config.ConfigFactory
 
 import collection.JavaConverters._
 import scala.concurrent.ExecutionContextExecutor
@@ -24,8 +22,8 @@ import scala.concurrent.ExecutionContextExecutor
 
 
 
-class GameSessionDBButlerActor(dbAccessURL: String, val dbAccessDispatcher: ExecutionContextExecutor) extends Actor with ActorLogging {
-
+class GameSessionDBButlerActor(val dbAccessURL: String, val dbAccessDispatcher: ExecutionContextExecutor)
+  extends Actor with ActorLogging with JOOQDBDialectDeterminer {
 
   log.info(s"DBButler for GameSession, initialized with driverURL:($dbAccessURL)")
 
@@ -63,14 +61,22 @@ class GameSessionDBButlerActor(dbAccessURL: String, val dbAccessDispatcher: Exec
 
       sender ! (if (rows == 1) DBActionInsertSuccess(1) else DBActionInsertFailure(s"$rows inserted"))
 
-    case m: Any   => log.info("Unknown message $m received, no database action possible." )
-
-
+    case m: Any   => log.info("Unknown message=$m, Database action possible." )
   }
 
 }
 
-object GameSessionDBButlerActor {
+object GameSessionDBButlerActor extends JOOQDBDialectDeterminer {
+
+  val localConfig =  ConfigFactory.load()
+
+  val jooqDialectString =
+    localConfig
+      .getConfig("GameSession.database")
+      .getString("jOOQDBDialect")
+
+  val dialectToUse = chooseDialect(if (jooqDialectString.isEmpty) "MARIADB" else jooqDialectString)
+
 
   def apply(dbAccessURL: String, dbAccessDispatcher: ExecutionContextExecutor): Props =
 
@@ -80,7 +86,8 @@ object GameSessionDBButlerActor {
         c: Connection, companyID: String, department: String, gameID: String, playerID: String, gameSessionUUID: String)
       : List[ComputedGameSessionRegSP] = {
 
-    val e = DSL.using(c, SQLDialect.MARIADB)
+    val e = DSL.using(c, dialectToUse)
+    // val e = DSL.using(c, dialect)
 
     val k = e.selectFrom(GAMESESSIONRECORDS)
       .where(GAMESESSIONRECORDS.COMPANYID.eq(companyID))
@@ -108,7 +115,8 @@ object GameSessionDBButlerActor {
 
   def upsert(c: Connection, gameSessionRecordableData: DBActionGameSessionRecord) = {
 
-    val e = DSL.using(c, SQLDialect.MARIADB)
+    // val e = DSL.using(c, SQLDialect.MARIADB)
+    val e = DSL.using(c, dialectToUse)
 
     val gameSessionRecord = e.newRecord(GAMESESSIONRECORDS)
 

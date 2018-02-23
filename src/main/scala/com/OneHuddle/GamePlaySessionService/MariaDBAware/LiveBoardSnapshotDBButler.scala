@@ -10,6 +10,7 @@ import com.OneHuddle.GamePlaySessionService.jOOQ.generated.Tables._
 import java.time._
 
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{ComputedGameSessionRegSP, LiveBoardSnapshot}
+import com.typesafe.config.ConfigFactory
 
 import scala.concurrent.ExecutionContextExecutor
 
@@ -20,7 +21,9 @@ import scala.concurrent.ExecutionContextExecutor
 
 
 
-class LiveBoardSnapshotDBButlerActor(dbAccessURL: String, val dbAccessDispatcher: ExecutionContextExecutor) extends Actor with ActorLogging {
+class LiveBoardSnapshotDBButlerActor(
+          dbAccessURL: String, val dbAccessDispatcher: ExecutionContextExecutor)
+      extends Actor with ActorLogging {
 
 
   log.info(s"DBButler for LiveBoardSnapshot, initialized with driverURL:($dbAccessURL)")
@@ -64,7 +67,16 @@ class LiveBoardSnapshotDBButlerActor(dbAccessURL: String, val dbAccessDispatcher
 
 }
 
-object LiveBoardSnapshotDBButlerActor {
+object LiveBoardSnapshotDBButlerActor extends JOOQDBDialectDeterminer {
+
+  val localConfig =  ConfigFactory.load()
+
+  val jooqDialectString =
+    localConfig
+      .getConfig("GameSession.database")
+      .getString("jOOQDBDialect")
+
+  val dialectToUse = chooseDialect(if (jooqDialectString.isEmpty) "MARIADB" else jooqDialectString)
 
   def apply(dbAccessURL: String, dbAccessDispatcher: ExecutionContextExecutor): Props =
 
@@ -74,7 +86,7 @@ object LiveBoardSnapshotDBButlerActor {
         c: Connection, companyID: String, department: String, gameID: String, playerID: String, gameSessionUUID: String)
       : List[ComputedGameSessionRegSP] = {
 
-    val e = DSL.using(c, SQLDialect.MARIADB)
+    val e = DSL.using(c, dialectToUse)
 
     /*val k = e.selectFrom(LIVEBOARDSNAPSHOTS)
         .where(LIVEBOARDSNAPSHOTS.)
@@ -100,7 +112,7 @@ object LiveBoardSnapshotDBButlerActor {
 
   def upsert(c: Connection, liveboardSnapshotData: DBActionLiveBoardSnapshotRecord) = {
 
-    val e = DSL.using(c, SQLDialect.MARIADB)
+    val e = DSL.using(c, dialectToUse)
 
     val snapshotRecord = e.newRecord(LIVEBOARDSNAPSHOTS)
 
