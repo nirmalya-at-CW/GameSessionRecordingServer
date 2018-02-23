@@ -55,7 +55,7 @@ CREATE TABLE `LiveBoardSnapshots` (
   `groupID` varchar(32) COLLATE utf8_bin NOT NULL DEFAULT 'NOTSET',
   `rankComputed` int(4) DEFAULT NULL,
   PRIMARY KEY (`recordID`,`snapshotTakenAt`,`timezoneApplicable`,`companyID`,`belongsToDepartment`,`playerID`,`gameID`,`gameType`)
-) ENGINE=InnoDB AUTO_INCREMENT=102 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
+) ENGINE=InnoDB AUTO_INCREMENT=51 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `PlayerDetails`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -89,7 +89,7 @@ CREATE TABLE `PlayerPerformance` (
   `timeTaken` int(11) NOT NULL,
   `winsAchieved` int(11) NOT NULL,
   PRIMARY KEY (`recordID`,`companyID`,`belongsToDepartment`,`playerID`,`gameID`,`gameType`,`groupID`,`lastPlayedOn`,`timezoneApplicable`)
-) ENGINE=InnoDB AUTO_INCREMENT=1866 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
+) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
