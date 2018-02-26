@@ -43,7 +43,7 @@ class AdminPanelNotifierActor extends Actor with ActorLogging {
         log.info(s"EvGameSessionLaunched Event for Admin Panel received, but gameSessionUUID=${ev.data.gameSessionUUID} seems to be live already.")
       else {
 
-        accumulateLiveSession(ev.data.gameSessionUUID, playerDetails)
+        accumulateLeaderSession(ev.data.gameSessionUUID, playerDetails)
 
         val jsonifiedAdminPanelDataToPush = prepareEventForAdminPanel
 
@@ -61,7 +61,7 @@ class AdminPanelNotifierActor extends Actor with ActorLogging {
         log.info(s"EvGameSessionLaunched Event for Admin Panel received, but gameSessionUUID=${ev.data.gameSessionUUID} seems not to exist.")
       else {
 
-        discardLiveSession(ev.data.gameSessionUUID)
+        discardLeaderSession(ev.data.gameSessionUUID)
 
         recordSessionFinishedByPlayer
 
@@ -81,7 +81,7 @@ class AdminPanelNotifierActor extends Actor with ActorLogging {
         log.info(s"EvGameSessionTerminatedByManager Event for Admin Panel received, but gameSessionUUID=${ev.data.gameSessionUUID} seems not to exist.")
       else {
 
-        discardLiveSession(ev.data.gameSessionUUID)
+        discardLeaderSession(ev.data.gameSessionUUID)
 
         recordSessionFinishedByManager
 
@@ -101,7 +101,7 @@ class AdminPanelNotifierActor extends Actor with ActorLogging {
         log.info(s"EvGameSessionTerminatedByTimeOut Event for Admin Panel received, but gameSessionUUID=${ev.data.gameSessionUUID} seems not to exist.")
       else {
 
-        discardLiveSession(ev.data.gameSessionUUID)
+        discardLeaderSession(ev.data.gameSessionUUID)
 
         recordSessionFinishedByTimeOut
 
@@ -133,13 +133,13 @@ class AdminPanelNotifierActor extends Actor with ActorLogging {
 
   }
 
-  private def accumulateLiveSession(gameSessionUUID: String, p: PlayerDetailsTriplet) = {
+  private def accumulateLeaderSession(gameSessionUUID: String, p: PlayerDetailsTriplet) = {
 
     this.liveGameSessions = this.liveGameSessions + (gameSessionUUID -> (p))
 
   }
 
-  private def discardLiveSession(gameSessionUUID: String) = {
+  private def discardLeaderSession(gameSessionUUID: String) = {
 
     this.liveGameSessions = this.liveGameSessions - (gameSessionUUID)
 

@@ -8,8 +8,8 @@ import akka.pattern._
 import akka.util.Timeout
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.EmittedEvents.{DataSharedWithAdminPanel, EvGameSessionLaunched}
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.ExternalAPIParams._
-import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{ExternalAPIParams, GameSession, HuddleGame, LiveBoardSnapshot, LiveBoardSnapshotBunch, QuestionAnswerTuple}
-import com.OneHuddle.GamePlaySessionService.MariaDBAware.{GameSessionDBButlerActor, LiveBoardSnapshotDBButlerActor}
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{ExternalAPIParams, GameSession, HuddleGame, LeaderBoardSnapshot, LeaderBoardSnapshotBunch, QuestionAnswerTuple}
+import com.OneHuddle.GamePlaySessionService.MariaDBAware.{GameSessionDBButlerActor, LeaderBoardSnapshotDBButlerActor}
 import com.OneHuddle.xAPI.ScormInformationExchangeActor
 
 import scala.concurrent.Future
@@ -23,7 +23,7 @@ import scala.util.{Failure, Success}
 class GameSessionSPOCActor(gameSessionFinishedEventEmitter: ActorRef) extends Actor with ActorLogging {
 
   case object ShutYourself
-  case class  InitiateLiveBoardSaveAction(l: List[LiveBoardSnapshot])
+  case class  InitiateLiveBoardSaveAction(l: List[LeaderBoardSnapshot])
 
 
   implicit val executionContext = context.dispatcher
@@ -46,11 +46,11 @@ class GameSessionSPOCActor(gameSessionFinishedEventEmitter: ActorRef) extends Ac
 
   val lrsExchangeActor = context.actorOf(ScormInformationExchangeActor(endpoint,"",user,password),"LRSExchange")
 
-  val dbAccessURL = context.system.settings.config.getConfig("GameSession.externalServices").getString("dbAccessURL")
+  val dbAccessURL = context.system.settings.config.getConfig("GameSession.database").getString("dbAccessURL")
 
   val adminPanelNotifierActor = context.actorOf(AdminPanelNotifierActor(), "AdminPanelNotifier-by-SPOC")
 
-  val liveBoardSnapshotSavingActor = context.actorOf(LiveBoardSnapshotDBButlerActor(dbAccessURL, executionContext))
+  val leaderBoardSnapshotSavingActor = context.actorOf(LeaderBoardSnapshotDBButlerActor(dbAccessURL, executionContext))
 
   // TODO: arrange for a specific dispatcher for the actors, accessing databases.
   val gameSessionRecordDBButler =
@@ -70,7 +70,7 @@ class GameSessionSPOCActor(gameSessionFinishedEventEmitter: ActorRef) extends Ac
 
   def receive = LoggingReceive.withLabel("SPOC") {
 
-    case l: LiveBoardSnapshotBunch  =>
+    case l: LeaderBoardSnapshotBunch  =>
       val originalSender = sender
       log.info(s"LiveBoardSnapShotBunch.entryCount=${l.bunch.length} received.")
       self ! InitiateLiveBoardSaveAction(l.bunch)
@@ -82,7 +82,7 @@ class GameSessionSPOCActor(gameSessionFinishedEventEmitter: ActorRef) extends Ac
     case bunch: InitiateLiveBoardSaveAction =>
 
       Future{
-        bunch.l.foreach (entry => liveBoardSnapshotSavingActor ! entry)
+        bunch.l.foreach (entry => leaderBoardSnapshotSavingActor ! entry)
       }.onComplete {
 
         case Success(r)  => log.info(s"LeaderboardSnapshots, saving=success, recordsCount=${bunch.l.length}.")

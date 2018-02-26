@@ -56,7 +56,7 @@ object PlayerDetailsButlerActor extends JOOQDBDialectDeterminer {
 
   def apply(dbAccessURL: String, dbAccessDispatcher: ExecutionContextExecutor): Props =
 
-             Props(new LiveBoardSnapshotDBButlerActor(dbAccessURL,dbAccessDispatcher))
+             Props(new LeaderBoardSnapshotDBButlerActor(dbAccessURL,dbAccessDispatcher))
 
   def retrieve(c: Connection, companyName: String, department: String, playerID: String): List[PlayerDetails] = {
 

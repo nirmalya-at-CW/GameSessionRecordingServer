@@ -147,17 +147,17 @@ object GameSessionHandlingServiceProtocol {
     override val gameType = "MINIMP"
   }
 
-  case class LiveboardConsumableData(
+  case class LeaderBoardConsumableData(
                companyID: String, departmentID: String, gameID: String, playerID: String,
                groupID: String, gameSessionUUID: String, score: Int
              )
 
-  case class LiveBoardSnapshot(takenAt: ZonedDateTime,timezoneApplicable: String,
-               companyID: String, departmentID: String, gameID: String, playerID: String,
-               gameType: String, groupID: String, rankComputed: Int
+  case class LeaderBoardSnapshot(takenAt: ZonedDateTime, timezoneApplicable: String,
+                                 companyID: String, departmentID: String, gameID: String, playerID: String,
+                                 gameType: String, groupID: String, rankComputed: Int
              )
 
-  case class LiveBoardSnapshotBunch(bunch: List[LiveBoardSnapshot])
+  case class LeaderBoardSnapshotBunch(bunch: List[LeaderBoardSnapshot])
 
   trait PlayerPerformancePerLastSession {
     val companyID: String
@@ -218,8 +218,8 @@ object GameSessionHandlingServiceProtocol {
         classOf[REQStartAGameWith],
         classOf[RedisRecordingStatus],
         classOf[HuddleRESPGameSessionBody],
-        classOf[LiveboardConsumableData],
-        classOf[LiveBoardSnapshotBunch]
+        classOf[LeaderBoardConsumableData],
+        classOf[LeaderBoardSnapshotBunch]
       )
     )
   )
@@ -290,7 +290,7 @@ object GameSessionHandlingServiceProtocol {
   case class  RedisRecordingStatus(details: String)
 
   case class  EmittedWhenGameSessionIsFinished(contents: String)
-  case class  DespatchedToLiveboardAcknowledgement (
+  case class  AckOfDepatchToLeaderBoard(
                  val statusHTTP: Int, val statusTextHTTP: String, val errorReason: Option[String] = None
              )
 
@@ -312,7 +312,7 @@ object GameSessionHandlingServiceProtocol {
           lastPlayedOn: LocalDateTime, timezoneApplicable: String,
           pointsObtained: Int, timeTaken: Int, winsAchieved: Int)
 
-    case class DBActionLiveBoardSnapshotRecord(
+    case class DBActionLeaderBoardSnapshotRecord(
           takenAtInUTC: LocalDateTime, timezoneApplicable: String,
           companyID: String, belongsToDepartment: String, playerID: String, gameID: String, gameType: String, groupID: String,
           rankComputed: Int)

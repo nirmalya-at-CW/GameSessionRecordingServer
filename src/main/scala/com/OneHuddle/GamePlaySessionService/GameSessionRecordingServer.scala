@@ -14,7 +14,7 @@ import akka.stream.scaladsl.Sink
 import akka.stream.{ActorMaterializer, Materializer}
 import akka.util.Timeout
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.ExternalAPIParams._
-import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.LiveBoardSnapshotBunch
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.LeaderBoardSnapshotBunch
 import com.redis.RedisClient
 import com.typesafe.config.ConfigFactory
 import de.heikoseeberger.akkahttpjson4s.Json4sSupport
@@ -45,7 +45,7 @@ object GameSessionRecordingServer {
   val gameSessionCompletionEmitter =
     underlyingActorSystem
     .actorOf(
-      LiveBoardNotifierActor.apply,"EmitterOnFinishingGameSession")
+      LeaderBoardNotifierActor.apply,"EmitterOnFinishingGameSession")
 
   val sessionHandlingSPOC =
     underlyingActorSystem
@@ -292,7 +292,7 @@ object GameSessionRecordingServer {
 
     post {
       pathPrefix("liveboardSnapshot") {
-        entity(as[LiveBoardSnapshotBunch]) { liveBoardSnapShotBunch =>
+        entity(as[LeaderBoardSnapshotBunch]) { liveBoardSnapShotBunch =>
           complete {
             println(s"req: $liveBoardSnapShotBunch")
             (sessionHandlingSPOC ? liveBoardSnapShotBunch).mapTo[HuddleRESPGameSessionBody]

@@ -10,7 +10,7 @@ import com.typesafe.config.ConfigFactory
 import com.OneHuddle.GamePlaySessionService.GameSessionCustodianActor
 
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.ExternalAPIParams.{ExpandedMessage, HuddleRESPGameSessionBodyWhenSuccessful}
-import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{ComputedGameSessionRegSP, EmittedWhenGameSessionIsFinished, GameSession, GameSessionEndedByPlayer, GameSessionEndedByTimeOut, HuddleGame, LiveboardConsumableData, QuestionAnswerTuple}
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{ComputedGameSessionRegSP, EmittedWhenGameSessionIsFinished, GameSession, GameSessionEndedByPlayer, GameSessionEndedByTimeOut, HuddleGame, LeaderBoardConsumableData, QuestionAnswerTuple}
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.HuddleGame.EvInitiated
 import com.OneHuddle.GamePlaySessionService.MariaDBAware.{NonExistentComputedGameSession, NonExistentGameSessionRecord}
 
@@ -156,7 +156,7 @@ class GameSessionCustodianBehaviourTest_1  extends TestKit(ActorSystem("ActorSys
 
     liveboardInformerProbe.expectMsg(
       Duration(5, "seconds"),
-      LiveboardConsumableData(
+      LeaderBoardConsumableData(
         gameSessionInfo.companyID,
         gameSessionInfo.departmentID,
         gameSessionInfo.gameID,

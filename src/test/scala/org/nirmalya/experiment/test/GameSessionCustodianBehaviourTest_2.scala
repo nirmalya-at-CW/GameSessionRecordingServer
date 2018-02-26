@@ -129,9 +129,9 @@ class GameSessionCustodianBehaviourTest_2  extends TestKit(ActorSystem(
       val evQuestionAnswered_2 =   HuddleGame.EvQuestionAnswered(gameStartsAt+4,questionaAndAnswers(1))
 
 
-      val liveboardInfomer = system.actorOf(DummyLiveBoardServiceGatewayActor(dummyLeaderboardServiceEndpoint))
+      val leaderboardInfomer = system.actorOf(DummyLiveBoardServiceGatewayActor(dummyLeaderboardServiceEndpoint))
 
-      val custodianActorName = s"GameSessionCustodianActor-${gameSessionInfo.gameSessionUUID}"
+      val custodianActorName = s"Custodian-session-${gameSessionInfo.gameSessionUUID}"
 
       val  custodian = system.actorOf(
         GameSessionCustodianActor(
@@ -139,7 +139,7 @@ class GameSessionCustodianBehaviourTest_2  extends TestKit(ActorSystem(
           redisHost,
           redisPort,
           maxGameSessionLifetime,
-          liveboardInfomer,
+          leaderboardInfomer,
           adminPanelNotifierActor,
           lrsProbe.ref,
           dbAccessURL

@@ -9,7 +9,7 @@ import org.jooq.impl.DSL
 import com.OneHuddle.GamePlaySessionService.jOOQ.generated.Tables._
 import java.time._
 
-import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{ComputedGameSessionRegSP, LiveBoardSnapshot}
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{ComputedGameSessionRegSP, LeaderBoardSnapshot}
 import com.typesafe.config.ConfigFactory
 
 import scala.concurrent.ExecutionContextExecutor
@@ -21,7 +21,7 @@ import scala.concurrent.ExecutionContextExecutor
 
 
 
-class LiveBoardSnapshotDBButlerActor(
+class LeaderBoardSnapshotDBButlerActor(
           dbAccessURL: String, val dbAccessDispatcher: ExecutionContextExecutor)
       extends Actor with ActorLogging {
 
@@ -30,7 +30,7 @@ class LiveBoardSnapshotDBButlerActor(
 
   override def receive: Receive =  {
 
-    case liveBoardSnapshot: LiveBoardSnapshot =>
+    case liveBoardSnapshot: LeaderBoardSnapshot =>
 
       val snapshotID = new StringBuffer()
                            .append(liveBoardSnapshot.companyID)
@@ -43,7 +43,7 @@ class LiveBoardSnapshotDBButlerActor(
 
       val snapshotTakenAtUTC = liveBoardSnapshot.takenAt.withZoneSameInstant(ZoneOffset.UTC)
 
-      val dbRecord = DBActionLiveBoardSnapshotRecord(
+      val dbRecord = DBActionLeaderBoardSnapshotRecord(
         snapshotTakenAtUTC.toLocalDateTime,
         liveBoardSnapshot.timezoneApplicable,
         liveBoardSnapshot.companyID,
@@ -55,7 +55,7 @@ class LiveBoardSnapshotDBButlerActor(
         liveBoardSnapshot.rankComputed
       )
 
-      val rows = LiveBoardSnapshotDBButlerActor
+      val rows = LeaderBoardSnapshotDBButlerActor
                  .upsert(
                    DriverManager.getConnection(dbAccessURL),
                    dbRecord
@@ -67,7 +67,7 @@ class LiveBoardSnapshotDBButlerActor(
 
 }
 
-object LiveBoardSnapshotDBButlerActor extends JOOQDBDialectDeterminer {
+object LeaderBoardSnapshotDBButlerActor extends JOOQDBDialectDeterminer {
 
   val localConfig =  ConfigFactory.load()
 
@@ -80,7 +80,7 @@ object LiveBoardSnapshotDBButlerActor extends JOOQDBDialectDeterminer {
 
   def apply(dbAccessURL: String, dbAccessDispatcher: ExecutionContextExecutor): Props =
 
-    Props(new LiveBoardSnapshotDBButlerActor(dbAccessURL, dbAccessDispatcher))
+    Props(new LeaderBoardSnapshotDBButlerActor(dbAccessURL, dbAccessDispatcher))
 
   def retrieve(
         c: Connection, companyID: String, department: String, gameID: String, playerID: String, gameSessionUUID: String)
@@ -110,7 +110,7 @@ object LiveBoardSnapshotDBButlerActor extends JOOQDBDialectDeterminer {
 
   }
 
-  def upsert(c: Connection, liveboardSnapshotData: DBActionLiveBoardSnapshotRecord) = {
+  def upsert(c: Connection, liveboardSnapshotData: DBActionLeaderBoardSnapshotRecord) = {
 
     val e = DSL.using(c, dialectToUse)
 

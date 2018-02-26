@@ -9,7 +9,7 @@ import akka.util.Timeout
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.ExternalAPIParams.{ExpandedMessage, HuddleRESPGameSessionBodyWhenFailed, HuddleRESPGameSessionBodyWhenSuccessful}
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.DBHatch.{DBActionGameSessionRecord, DBActionInsert, DBActionInsertSuccess, DBActionOutcome}
 import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.EmittedEvents._
-import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{ComputedGameSessionRegSP, DBHatch, DespatchedToLiveboardAcknowledgement, GameSession, GameSessionEndedByPlayer, HuddleGame, LiveboardConsumableData, PlayerPerformanceRecordSP}
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{ComputedGameSessionRegSP, DBHatch, AckOfDepatchToLeaderBoard, GameSession, GameSessionEndedByPlayer, HuddleGame, LeaderBoardConsumableData, PlayerPerformanceRecordSP}
 import com.OneHuddle.GamePlaySessionService.MariaDBAware.{GameSessionDBButlerActor, PlayerPerformanceDBButlerActor}
 import com.OneHuddle.xAPI.UpdateLRSGamePlayed
 
@@ -136,7 +136,7 @@ class GameSessionCustodianActor (
         case Failure(e) => originalSender ! HuddleRESPGameSessionBodyWhenFailed(ExpandedMessage(1200, e.getMessage))
       }
 
-      log.debug(s"GameSession ${gameSessionInfo.gameSessionUUID}, ends. Cause: Player finished.")
+      log.debug(s"End of GameSession=${gameSessionInfo.gameSessionUUID},Cause=Player finished.")
       context.become(gamePlayIsBarredState)
 
     case ev: HuddleGame.EvForceEndedByManager  =>
@@ -209,7 +209,7 @@ class GameSessionCustodianActor (
       // for being offered to Liveboard
       if (ev.computedGameSession.endedBecauseOf == GameSessionEndedByPlayer.toString) {
 
-        val infoForLiveBoard = LiveboardConsumableData(
+        val infoForLiveBoard = LeaderBoardConsumableData(
           gameSessionInfo.companyID,
           gameSessionInfo.departmentID,
           gameSessionInfo.gameID,
@@ -246,10 +246,10 @@ class GameSessionCustodianActor (
       else
         context.become(expectingConfirmationsFromDownstreamServicesState(updatedConfirmations))
 
-    case DespatchedToLiveboardAcknowledgement =>
+    case AckOfDepatchToLeaderBoard =>
       log.info(s"GameSession ${gameSessionInfo.gameSessionUUID}, update sent to Liveboard Service")
 
-      val updatedConfirmations = allTheseConfirmations.filter(e => e != DespatchedToLiveboardAcknowledgement.toString)
+      val updatedConfirmations = allTheseConfirmations.filter(e => e != AckOfDepatchToLeaderBoard.toString)
 
       if (updatedConfirmations.isEmpty) {
         self ! CloseGameSession

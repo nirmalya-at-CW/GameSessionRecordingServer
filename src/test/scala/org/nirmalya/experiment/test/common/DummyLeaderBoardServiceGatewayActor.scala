@@ -2,7 +2,7 @@ package org.nirmalya.experiment.test.common
 
 import akka.actor.{Actor, ActorLogging, Props}
 import akka.event.LoggingReceive
-import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{DespatchedToLiveboardAcknowledgement, LiveboardConsumableData}
+import com.OneHuddle.GamePlaySessionService.GameSessionHandlingServiceProtocol.{AckOfDepatchToLeaderBoard, LeaderBoardConsumableData}
 
 import scala.sys.Prop
 
@@ -14,10 +14,10 @@ class DummyLiveBoardServiceGatewayActor(liveBoardServiceEndpoint: String) extend
 
   override def receive = LoggingReceive.withLabel("Liveboard"){
 
-    case lb: LiveboardConsumableData =>
+    case lb: LeaderBoardConsumableData =>
 
       log.info(s"liveboard information: ${lb}")
-      sender ! DespatchedToLiveboardAcknowledgement
+      sender ! AckOfDepatchToLeaderBoard
 
   }
 }
